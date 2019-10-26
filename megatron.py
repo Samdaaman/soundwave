@@ -15,6 +15,7 @@ def main():
     print('Initialising Shell on port:' + PORT_SHELL)
     process_shell = subprocess.Popen(["gnome-terminal", "--", "nc", "-lvp", PORT_SHELL], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
 
+
     print('Connection from soundwave received')
     while True:
         check_file_update()

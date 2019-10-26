@@ -8,13 +8,13 @@ PORT_SHELL = '7891'
 def main():
     print('Initialising Communications on port:' + PORT_MAIN)
     process_main = subprocess.Popen(["nc", "-lvp", PORT_MAIN], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    while 'received!' not in process_main.stderr.readline():
+    while b'received!' not in process_main.stderr.readline():
         if process_main.poll() is not None:
             raise Exception('Unexpected Error 101 - nc (main) closed unexpectedly')
 
     print('Initialising Shell on port:' + PORT_SHELL)
     process_shell = subprocess.Popen(["gnome-terminal", "-e", "nc", "-lvp", PORT_SHELL], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    while 'received!' not in process_shell.stderr.readline():
+    while b'received!' not in process_shell.stderr.readline():
         if process_shell.poll() is not None:
             raise Exception('Unexpected Error 102 - nc (shell) closed unexpectedly')
 

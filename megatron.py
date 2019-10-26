@@ -16,7 +16,7 @@ def main():
     output = process.communicate()[0]
     print('ouput = ' + output)
     exitcode = process.returncode
-    print('exitcode = ' + exitcode)
+    print('exitcode = ' + str(exitcode))
 
 
 if __name__ == "__main__":

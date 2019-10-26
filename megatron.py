@@ -6,7 +6,7 @@ PORT = '7890'
 
 def main():
     print('Initialising Communications on port:' + PORT)
-    process = subprocess.Popen("nc -lvp " + PORT, stdout=subprocess.PIPE, universal_newlines=True)
+    process = subprocess.Popen(["nc", "-lvp", PORT], stdout=subprocess.PIPE, universal_newlines=True)
     while True:
         line = process.stdout.readline()
         if line == '' and process.poll() is not None:

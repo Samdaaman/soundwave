@@ -1,4 +1,5 @@
 import subprocess
+import sys
 
 PORT = '7890'
 
@@ -13,4 +14,6 @@ def main():
 
 
 if __name__ == "__main__":
+    if sys.version_info[0] < 3:
+        raise Exception("Python 3 or above required")
     main()

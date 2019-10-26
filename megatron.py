@@ -7,7 +7,7 @@ PORT = '7890'
 def main():
     print('Initialising Communications on port:' + PORT)
     process = subprocess.Popen(["nc", "-lvp", PORT], stdout=subprocess.PIPE, universal_newlines=True)
-    while process.stdout.readline() != 'Listening on [0.0.0.0] (family 0, port ' + PORT + ')'
+    while process.stdout.readline() != 'Listening on [0.0.0.0] (family 0, port ' + PORT + ')':
         if process.poll() is not None:
             raise Exception('Unexpected Error 101')
     print('Connection from Host received')

@@ -3,19 +3,31 @@ import sys
 
 PORT = '7890'
 
-
 def main():
     print('Initialising Communications on port:' + PORT)
-    process = subprocess.Popen(["nc", "-lvp", PORT], stdout=subprocess.PIPE, universal_newlines=True)
-    while process.stdout.readline() != 'Listening on [0.0.0.0] (family 0, port ' + PORT + ')':
+    process = subprocess.Popen(["nc", "-lvp", PORT], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    while 'received!' not in process.stderr.readline():
         if process.poll() is not None:
-            raise Exception('Unexpected Error 101')
-    print('Connection from Host received')
+            raise Exception('Unexpected Error 101 - nc closed unexpectedly')
+    print('Connection from soundwave received')
     while True:
-        line = process.stdout.readline()
-        if line == '' and process.poll() is not None:
+        command = input('Command or Enter to Refresh:\n')
+        if command != '':
+            process.stdin.write('-bc\n')
+            process.stdin.flush()
+            process.stdin.write(command + '\n')
+            process.stdin.flush()
+            reply = ''
+            while True:
+                reply = process.stdout.readline().rstrip()
+                if reply == '-ec':
+                    break
+                print(reply)
+
+        if process.poll() is not None:
+            print('Process terminated on soundwave end')
             break
-        print('line = ' + line)
+
 
     output = process.communicate()[0]
     print('ouput = ' + output)

@@ -6,11 +6,17 @@ PORT = '7890'
 
 def main():
     print('Initialising Communications on port:' + PORT)
-    popen = subprocess.Popen("nc", stdout=subprocess.PIPE, universal_newlines=True)
-    for stdout_line in iter(popen.stdout.readline(), ""):
-        print(stdout_line)
-    popen.stdout.close()
-    return_code = popen.wait()
+    process = subprocess.Popen("nc", stdout=subprocess.PIPE, universal_newlines=True)
+    while True:
+        line = process.stdout.readline()
+        if line == '' and process.poll() is not None:
+            break
+        print('line = ' + line)
+
+    output = process.communicate()[0]
+    print('ouput = ' + output)
+    exitcode = process.returncode
+    print('exitcode = ' + exitcode)
 
 
 if __name__ == "__main__":

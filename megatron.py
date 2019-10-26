@@ -7,31 +7,17 @@ PORT_SHELL = '7891'
 
 def main():
     print('Initialising Communications on port:' + PORT_MAIN)
-    process_main = subprocess.Popen(["nc", "-lvp", PORT_MAIN], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    while b'received!' not in process_main.stderr.readline():
+    process_main = subprocess.Popen(["nc", "-lvp", PORT_MAIN], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    while 'received!' not in process_main.stderr.readline():
         if process_main.poll() is not None:
             raise Exception('Unexpected Error 101 - nc (main) closed unexpectedly')
 
     print('Initialising Shell on port:' + PORT_SHELL)
-    process_shell = subprocess.Popen(["gnome-terminal", "-e", "nc", "-lvp", PORT_SHELL], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    while b'received!' not in process_shell.stderr.readline():
-        if process_shell.poll() is not None:
-            raise Exception('Unexpected Error 102 - nc (shell) closed unexpectedly')
+    process_shell = subprocess.Popen(["gnome-terminal", "--", "nc", "-lvp", PORT_SHELL], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
 
     print('Connection from soundwave received')
     while True:
-        command = input('Input Command or Enter to Refresh:\n')
-        if command != '':
-            process_main.stdin.write('-bc\n')
-            process_main.stdin.flush()
-            process_main.stdin.write(command + '\n')
-            process_main.stdin.flush()
-            reply = ''
-            while True:
-                reply = process_main.stdout.readline().rstrip()
-                if reply == '-ec':
-                    break
-                print(reply)
+        check_file_update()
 
         if process_main.poll() is not None:
             print('Process terminated on soundwave end')
@@ -42,6 +28,10 @@ def main():
     print('ouput = ' + output)
     exitcode = process_main.returncode
     print('exitcode = ' + str(exitcode))
+
+
+def check_file_update():
+    return
 
 
 if __name__ == "__main__":

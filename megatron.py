@@ -33,6 +33,7 @@ def main():
                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
 
     print('Connection from soundwave received')
+    print('------------------------------------------')
     while True:
         files_update(process_main)
 

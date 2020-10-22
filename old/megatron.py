@@ -49,7 +49,7 @@ def main():
 
 def files_update(process_main):
     # TODO add in file updates
-    files_to_process = [f for f in os.listdir('.') if
+    files_to_process = [f for f in os.listdir('..') if
                         os.path.isfile(f) and f not in processed_files and not f.startswith(IGNORE_PREFIX)]
     if not files_to_process:
         return

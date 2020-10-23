@@ -12,3 +12,10 @@
 - Serves as the main running file on the compromised system
 - Is downloaded and run by wheelie
 - Inspired by Soundwave's partner in crime that specialises in infiltration
+
+---
+# Soundwave Ports
+- 1337 - Web server port
+- 1338 - Initial hello (ping-back) port
+- 1339 - Command channel to Ravage
+- 13370+ - Reverse shell ports

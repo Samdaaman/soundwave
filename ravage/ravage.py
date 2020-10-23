@@ -1,15 +1,23 @@
 import os
 import sys
 from time import sleep
-import settings
+from . import config
+from . import commands
+from . import communication
 
-if len(sys.argv) != 3:
+if len(sys.argv) != 4:
     raise Exception('Called with wrong amount of arguments')
 else:
-    settings.ravage_ip = sys.argv[1]
-    settings.soundwave_ip = sys.argv[2]
+    config.ravage_ip = sys.argv[1]
+    config.soundwave_ip = sys.argv[2]
+    config.communication_port = int(sys.argv[3])
 
-os.system(f'echo Hello from Ravage | nc {settings.soundwave_ip} 1338')
+print('Ravage initialised and trying to connect back to Soundwave')
 
-print('Dying after 10 seconds')
-sleep(10)
+communication.connect()
+print('Successfully connected to Soundwave')
+communication.process_commands_forever()
+print('Waiting 3 seconds then sending hello ping')
+sleep(3)
+print('Sending hello')
+config.queue_commands.put(commands.all_commands[0])

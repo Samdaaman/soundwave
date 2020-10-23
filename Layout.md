@@ -19,3 +19,10 @@
 - 1338 - Initial hello (ping-back) port
 - 1339 - Command channel to Ravage
 - 13370+ - Reverse shell ports
+
+---
+# Commands API
+- hello - initial ping-back sent by ravage to the C2 centre ("Hello from Ravage")
+- shell - drop a shell on a separate terminal window
+- linenum - run LinEnum.sh on the target and return the result
+- linpeas - run linpeas.sh on the target and return the result

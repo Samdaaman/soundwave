@@ -2,7 +2,8 @@ from flask import Flask, request
 import zipfile
 import os
 import threading
-import settings
+from . import target_manager
+from . import config
 import logging
 
 app = Flask(__name__)
@@ -11,6 +12,7 @@ WEB_SERVER_PORT = '1337'
 WHEELIE_PATH = os.path.join(os.path.dirname(__file__), '../wheelie/wheelie.py')
 WHEELIE_SOUNDWAVE_IP_PLACEHOLDER = "'<>SOUNDWAVE_IP</>'"
 WHEELIE_WEB_SEVER_PORT_PLACEHOLDER = "'<>WEB_SERVER_PORT</>'"
+WHEELIE_COMMUNICATION_PORT_PLACEHOLDER = "'<>COMMUNICATION_PORT</>'"
 WHEELIE_RAVAGE_IP_PLACEHOLDER = "'<>RAVAGE_IP</>'"
 RAVAGE_PATH = os.path.join(os.path.dirname(__file__), '../ravage')
 
@@ -26,9 +28,10 @@ def wheelie():
     with open(WHEELIE_PATH) as fh:
         data = ''.join(fh.readlines())
     for s, r in (
-            (WHEELIE_SOUNDWAVE_IP_PLACEHOLDER, f"'{settings.soundwave_ip}'"),
+            (WHEELIE_SOUNDWAVE_IP_PLACEHOLDER, f"'{config.soundwave_ip}'"),
             (WHEELIE_WEB_SEVER_PORT_PLACEHOLDER, f"'{WEB_SERVER_PORT}'"),
-            (WHEELIE_RAVAGE_IP_PLACEHOLDER, f"'{request.remote_addr}'")
+            (WHEELIE_RAVAGE_IP_PLACEHOLDER, f"'{request.remote_addr}'"),
+            (WHEELIE_COMMUNICATION_PORT_PLACEHOLDER, f"'{target_manager.new_target(request.remote_addr)}'")
     ):
         data = data.replace(s, r)
 

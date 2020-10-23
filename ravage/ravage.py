@@ -9,7 +9,7 @@ else:
     settings.ravage_ip = sys.argv[1]
     settings.soundwave_ip = sys.argv[2]
 
-os.system(f'cat hello.txt | nc {settings.soundwave_ip} 1338')
+os.system(f'echo Hello from Ravage | nc {settings.soundwave_ip} 1338')
 
 print('Dying after 10 seconds')
 sleep(10)

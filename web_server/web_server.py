@@ -8,11 +8,12 @@ import logging
 app = Flask(__name__)
 
 WEB_SERVER_PORT = '1337'
-WHEELIE_PATH = '../wheelie/wheelie.py'
+WHEELIE_PATH = os.path.join(os.path.dirname(__file__), '../wheelie/wheelie.py')
 WHEELIE_SOUNDWAVE_IP_PLACEHOLDER = "'<>SOUNDWAVE_IP</>'"
 WHEELIE_WEB_SEVER_PORT_PLACEHOLDER = "'<>WEB_SERVER_PORT</>'"
 WHEELIE_RAVAGE_IP_PLACEHOLDER = "'<>RAVAGE_IP</>'"
-RAVAGE_PATH = '../ravage'
+RAVAGE_PATH = os.path.join(os.path.dirname(__file__), '../ravage')
+
 
 @app.route('/')
 def hello_world():

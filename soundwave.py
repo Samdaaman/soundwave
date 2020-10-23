@@ -1,8 +1,7 @@
-import web_server
+from web_server import web_server
 import settings
 import libtmux
-from time import sleep
-
+from ravage import commands
 
 def main():
     print('Connecting to tmux session')
@@ -12,7 +11,7 @@ def main():
     except:
         print('Tmux session not found, please start tmux first')
         exit(1)
-    session = None
+
     if len(sessions) == 1:
         session = sessions[0]
     else:
@@ -36,9 +35,21 @@ def main():
     while 'Hello from Ravage' not in pane_hello.cmd('capture-pan', '-p').stdout:
         pass
     pane_hello.window.kill_window()
-    with open('../ravage/hello.txt') as fh:
-        print(''.join(fh.readlines()))
+    print('______\n| ___ \\\n| |_/ /__ ___   ____ _  __ _  ___\n|    // _` \ \ / / _` |/ _` |/ _ \\\n| |\\ \\ (_| |\\ V / (_| | (_| |  __/\n\\_| \\_\\__,_| \\_/ \\__,_|\\__, |\\___|                        __/ |\n                       |___/')
     print()
+
+    while True:
+        print('Enter Command Number:')
+        for i in range(len(commands.all_commands)):
+            print(f'{i + 1} : {commands.all_commands[i].command_key}')
+
+        try:
+            num = int(input(''))
+            command = commands.all_commands[num - 1]
+        except ValueError or IndexError:
+            pass
+        else:
+            # TODO send command
 
 
 if __name__ == '__main__':

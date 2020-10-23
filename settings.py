@@ -16,12 +16,16 @@ def set_soundwave_ip():
         else:
             name = result_arr[i].split('\n')[-1]
 
-        ip = result_arr[i + 1].split('inet ')[1].split(' ')[0]
+        try:
+            ip = result_arr[i + 1].split('inet ')[1].split(' ')[0]
 
-        if name == ADAPTER:
-            soundwave_ip = ip
-            print(f'Set Soundwave IP to {ip}')
-            return
+            if name == ADAPTER:
+                soundwave_ip = ip
+                print(f'Set Soundwave IP to {ip}')
+                return
+        except IndexError:
+            pass
+
     print('Could not set Soundwave IP, check adapters')
     exit(-1)
 

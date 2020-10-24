@@ -17,6 +17,7 @@ class CommandHello(Command):
     def process_result(self, result: str, target: config.Target):
         if result == 'Hello from Ravage':
             target.set_status(config.TargetStatus.VERIFIED)
+            print(f'Target {target.name}:{target.local_port} said hello', flush=True)
 
 
 @dataclass

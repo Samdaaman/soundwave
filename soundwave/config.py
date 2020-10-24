@@ -16,17 +16,29 @@ class TargetStatus(Enum):
 
 class Target:
     name: str
-    _status = TargetStatus.INITIALISED
-    _status_lock = threading.Lock()
     local_port: int
     remote_ip: str
     sock: socket.socket
 
-    def __init__(self, name: str, local_port: int, remote_ip: str):
+    def __init__(self, name: str, remote_ip: str):
         self.name = name
-        self.local_port = local_port
         self.remote_ip = remote_ip
-        self.sock = socket.create_server(('', local_port))
+        self._status = TargetStatus.INITIALISED
+        self._status_lock = threading.Lock()
+
+        global last_used_port
+        last_used_port_lock.acquire()
+        try:
+            while True:
+                last_used_port += 1
+                try:
+                    self.sock = socket.create_server(('', last_used_port))
+                    self.local_port = last_used_port
+                    break
+                except socket.error:
+                    pass
+        finally:
+            last_used_port_lock.release()
 
     def set_status(self, status: TargetStatus):
         self._status_lock.acquire()

@@ -68,7 +68,7 @@ def start():
 
 
 def main():
-    threading.Thread(target=start).start()
+    threading.Thread(target=start, daemon=True).start()
 
 
 if __name__ == '__main__':

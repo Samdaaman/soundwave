@@ -2,6 +2,7 @@ from . import web_server
 from . import config
 from . import commands
 from . import communication
+from . import results
 
 
 def main():
@@ -13,10 +14,13 @@ def main():
 
     print(f'Starting service on {config.soundwave_ip} using {config.ADAPTER}')
     web_server.main()
+    results.initialise()
     print('Web server started... please run below command on client:')
     print(f'curl {config.soundwave_ip}:{web_server.WEB_SERVER_PORT}/wheelie > tmp.py; python3 tmp.py')
 
-    print('______\n| ___ \\\n| |_/ /__ ___   ____ _  __ _  ___\n|    // _` \ \ / / _` |/ _` |/ _ \\\n| |\\ \\ (_| |\\ V / (_| | (_| |  __/\n\\_| \\_\\__,_| \\_/ \\__,_|\\__, |\\___|                        __/ |\n                       |___/')
+    print('______\n| ___ \\\n| |_/ /__ ___   ____ _  __ _  ___\n|    // _` \\ \\ / / _` |/ _` |/ _ \\\n| |\\ \\ (_| '
+          '|\\ V / (_| | (_| |  __/\n\\_| \\_\\__,_| \\_/ \\__,_|\\__, |\\___|\n                        __/ |\n       '
+          '                |___/')
     print()
 
     while True:
@@ -52,7 +56,3 @@ def main():
                     result = communication.send_command_to_target(command, config.targets[num - 1])
                     if result is not None:
                         print(result)
-
-
-if __name__ == '__main__':
-    main()

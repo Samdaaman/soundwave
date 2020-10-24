@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-
+import os
 from typing import List
 import subprocess
 
@@ -27,9 +27,10 @@ class CommandGenericScript(Command):
 
     def get_result(self) -> str:
         script_path = f'{RESOURCES_DIR}/{self.script_name}'
+        os.system(f'chmod +x {script_path}')
         process = subprocess.Popen([script_path] + self.script_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = process.communicate()
-        return f'out: "{out}"\nerr: "{err}"'
+        return out.decode("utf-8")
 
 
 all_commands = [

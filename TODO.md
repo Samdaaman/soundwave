@@ -7,6 +7,7 @@
 - Spawning shell sessions
 - Support when python is not installed
 - Pivoting between users (including when root is obtained) - another executable file in path dir?
+- Freezing iptables
 
 ## Config file
 - Stealth mode (random location, communicates periodically, obfuscuated code, set time created/modified) - http://blog.ablepear.com/2012/10/bundling-python-files-into-stand-alone.html

@@ -14,7 +14,7 @@
  */
 static const char* process_to_filter = "hidden.sh";
 static const char* process_wildcard_filter = "1337";
-static const char* environ_password = "hidemefromps=yesplease";
+static const char* environ_password = "hideme=yesplease";
 
 /*
  * Get a directory name given a DIR* handle

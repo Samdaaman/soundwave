@@ -1,0 +1,24 @@
+version: '2'
+
+services:
+    vulnbox:
+        build: ./vulnbox
+        networks:
+            vpcbr:
+                ipv4_address: 10.10.10.2
+
+    toolbox:
+        build: ./toolbox
+        # volumes:
+        #     - ./exploits:/opt/exploits
+        networks: 
+            vpcbr:
+                ipv4_address: 10.10.10.1
+
+networks:
+    vpcbr:
+        driver: bridge
+        ipam:
+            config:
+                 - subnet: 10.10.10.0/16
+                   gateway: 10.10.10.254

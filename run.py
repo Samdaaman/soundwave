@@ -1,3 +1,3 @@
-from soundwave import soundwave
+import soundwave
 
 soundwave.main()

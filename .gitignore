@@ -1,4 +1,4 @@
-/.idea/
-/venv/
-/results/
-!/results/.gitkeep
+.idea/
+venv/
+/ravage/resources/build/*
+!/ravage/resources/build/.gitkeep

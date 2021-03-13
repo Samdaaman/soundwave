@@ -12,6 +12,10 @@ def main():
         print(result)
         exit(-1)
 
+    print('Building Ravage Modules')
+    from . import exploits_src
+    exploits_src.build()
+
     print(f'Starting service on {config.soundwave_ip} using {config.ADAPTER}')
     web_server.main()
     results.initialise()

@@ -18,7 +18,7 @@ def main():
 
     if layer == 0:
         child = subprocess.Popen(
-            ['python3', f'{os.path.dirname(__file__)}/entrypoint'],
+            ['python3', 'entrypoint.py'],
             stdout=subprocess.PIPE
         )
         grand_child_pid = child.stdout.readline().decode()[:-1]
@@ -40,13 +40,16 @@ def main():
             start_new_session=True
         )
 
-        print(grand_child.pid)
-
         grand_child.stdin.write(f'exec -a {PROCESS_NAME} python3\n'.encode())
         grand_child.stdin.flush()
-        with open(f'{os.path.dirname(__file__)}/entrypoint', 'rb') as fh:
+        with open(f'entrypoint.py', 'rb') as fh:
             grand_child.stdin.write(fh.read())
         grand_child.stdin.close()
+
+        print(grand_child.pid, flush=True)
+        if config.DEBUG:
+            import time
+            time.sleep(10)
 
     else:
         print('Hello from the grandchild')

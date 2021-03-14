@@ -58,4 +58,5 @@ else:
     os.environ['RAVAGE_IP'] = RAVAGE_IP
     os.environ['COMMUNICATION_PORT'] = COMMUNICATION_PORT
     os.environ['RAVAGE_ROOT_DIR'] = RAVAGE_ROOT_DIR
-    os.system(f'python3 {RAVAGE_ROOT_DIR}/entrypoint')
+    os.chdir(RAVAGE_ROOT_DIR)
+    os.system(f'python3 entrypoint.py')

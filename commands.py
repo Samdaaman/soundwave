@@ -8,9 +8,9 @@ class Command:
 
     def __init__(self, key: Union[str, COMMAND_KEYS]):
         if isinstance(key, COMMAND_KEYS):
-            self.key = key.value
+            self.key = str(key.value)
         else:
-            self.key = key
+            self.key = str(key)
 
     def before(self):
         pass

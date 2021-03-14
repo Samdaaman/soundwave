@@ -2,3 +2,5 @@
 venv/
 /ravage/resources/build/*
 !/ravage/resources/build/.gitkeep
+/results/*
+!/results/.gitkeepE

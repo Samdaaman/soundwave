@@ -1,10 +1,11 @@
 import config
 from dataclasses import dataclass
+from ravage.command_keys import COMMAND_KEYS
 
 
 @dataclass
 class Command:
-    command_key: str
+    command_key: COMMAND_KEYS
 
     def before(self):
         pass
@@ -13,7 +14,7 @@ class Command:
         raise NotImplementedError()
 
 
-class CommandHello(Command):
+class CommandPing(Command):
     def process_result(self, result: str, target: config.Target):
         if result == 'Hello from Ravage':
             target.set_status(config.TargetStatus.VERIFIED)
@@ -22,16 +23,14 @@ class CommandHello(Command):
 
 @dataclass
 class CommandGenericScript(Command):
-    command_key: str
-
     def process_result(self, result: str, target: config.Target):
-        with open(f'{config.RESULTS_DIR}/{target.name}_{self.command_key}.out.txt', 'w') as fh:
+        with open(f'{config.RESULTS_DIR}/{target.name}_{self.command_key.value}.out.txt', 'w') as fh:
             fh.write(result)
 
 
 all_commands = [
-    CommandHello('hello'),
-    CommandGenericScript('linenum'),
-    CommandGenericScript('linpeas')
+    CommandPing(COMMAND_KEYS.PING),
+    CommandGenericScript(COMMAND_KEYS.LINENUM),
+    CommandGenericScript(COMMAND_KEYS.LINPEAS)
 ]
 

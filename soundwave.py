@@ -3,6 +3,7 @@ import config
 import commands
 import communication
 import results
+from exploits_src import build as exploits_src
 
 
 def main():
@@ -13,7 +14,6 @@ def main():
         exit(-1)
 
     print('Building Ravage Modules')
-    from . import exploits_src
     exploits_src.build()
 
     print(f'Starting service on {config.soundwave_ip} using {config.ADAPTER}')
@@ -30,7 +30,7 @@ def main():
     while True:
         print('Enter Command Number:')
         for i in range(len(commands.all_commands)):
-            print(f'{i + 1} : {commands.all_commands[i].command_key}')
+            print(f'{i + 1} : {commands.all_commands[i].command_key.value}')
 
         try:
             num = int(input(''))

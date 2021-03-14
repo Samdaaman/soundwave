@@ -15,7 +15,7 @@ def initialise():
 
             def get_command():
                 for command_loop in commands.all_commands:
-                    if command_key == command_loop.command_key.value:
+                    if command_key == command_loop.key.value:
                         return command_loop
                 raise NotImplementedError(f'Command result received is not implemented yet (for key {command_key})')
 

@@ -1,11 +1,16 @@
 import config
-from dataclasses import dataclass
 from ravage.command_keys import COMMAND_KEYS
+from typing import Union
 
 
-@dataclass
 class Command:
-    command_key: COMMAND_KEYS
+    key: str
+
+    def __init__(self, key: Union[str, COMMAND_KEYS]):
+        if isinstance(key, COMMAND_KEYS):
+            self.key = key.value
+        else:
+            self.key = key
 
     def before(self):
         pass
@@ -21,10 +26,9 @@ class CommandPing(Command):
             print(f'Target {target.name}:{target.local_port} said hello', flush=True)
 
 
-@dataclass
 class CommandGenericScript(Command):
     def process_result(self, result: str, target: config.Target):
-        with open(f'{config.RESULTS_DIR}/{target.name}_{self.command_key.value}.out.txt', 'w') as fh:
+        with open(f'{config.RESULTS_DIR}/{target.name}_{self.key}.out.txt', 'w') as fh:
             fh.write(result)
 
 
@@ -34,3 +38,9 @@ all_commands = [
     CommandGenericScript(COMMAND_KEYS.LINPEAS)
 ]
 
+for command_key in COMMAND_KEYS:
+    for command in all_commands:
+        if command.key == command_key.value:
+            break
+    else:
+        raise Exception(f'Command for key {command_key.value} missing')

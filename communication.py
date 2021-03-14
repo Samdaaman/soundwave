@@ -5,7 +5,7 @@ import base64
 
 
 def send_command_to_target(command: commands.Command, target: config.Target):
-    command_parts = [command.command_key.value]  # type: List[str]
+    command_parts = [command.key]  # type: List[str]
     data = b':'.join([base64.b64encode(command_part.encode('utf-8')) for command_part in command_parts]) + b'\n'
     target.sock.send(data)
 

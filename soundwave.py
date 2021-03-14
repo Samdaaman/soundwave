@@ -1,6 +1,7 @@
 import web_server
 import config
 import commands
+from ravage import commands as ravage_commands
 import communication
 import results
 from exploits_src import build as exploits_src
@@ -19,6 +20,8 @@ def main():
     print(f'Starting service on {config.soundwave_ip} using {config.ADAPTER}')
     web_server.main()
     results.initialise()
+    ravage_commands.assert_has_all_commands(ravage_commands.all_commands)
+    ravage_commands.assert_has_all_commands(commands.all_commands)
     print('Web server started... please run below command on client:')
     print(f'curl {config.soundwave_ip}:{web_server.WEB_SERVER_PORT}/wheelie > tmp.py; python3 tmp.py')
 
@@ -30,7 +33,7 @@ def main():
     while True:
         print('Enter Command Number:')
         for i in range(len(commands.all_commands)):
-            print(f'{i + 1} : {commands.all_commands[i].command_key.value}')
+            print(f'{i + 1} : {commands.all_commands[i].key}')
 
         try:
             num = int(input(''))

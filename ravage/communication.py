@@ -1,9 +1,10 @@
 import threading
-import config
 import socket
-import commands
 from typing import Optional
 import base64
+
+from . import config
+from . import commands
 
 sock = None  # type: Optional[socket.socket]
 
@@ -13,7 +14,7 @@ def process_commands_forever():
         while True:
             command = config.queue_commands.get()  # type: commands.Command
             result = command.get_result()
-            data = b':'.join([base64.b64encode(data_part.encode('utf-8')) for data_part in [command.command_key.value, result]]) + b'\n'
+            data = b':'.join([base64.b64encode(data_part.encode('utf-8')) for data_part in [command.key, result]]) + b'\n'
             sock.send(data)
 
     threading.Thread(target=do_work, daemon=True).start()
@@ -34,7 +35,7 @@ def listen_for_commands_forever():
         command_key = command_parts[0]
 
         for command in commands.all_commands:
-            if command.command_key.value == command_key:
+            if command.key == command_key:
                 config.queue_commands.put(command)
                 break
         else:
@@ -43,4 +44,4 @@ def listen_for_commands_forever():
 
 def connect():
     global sock
-    sock = socket.create_connection((config.soundwave_ip, config.communication_port))
+    sock = socket.create_connection((config.SOUNDWAVE_IP, config.COMMUNICATION_PORT))

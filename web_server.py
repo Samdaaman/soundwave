@@ -2,8 +2,8 @@ from flask import Flask, request
 import zipfile
 import os
 import threading
-from . import target_manager
-from . import config
+import target_manager
+import config
 import logging
 
 app = Flask(__name__)

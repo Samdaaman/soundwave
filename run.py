@@ -1,3 +1,0 @@
-import soundwave
-
-soundwave.main()

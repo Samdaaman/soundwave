@@ -1,5 +1,5 @@
-from . import config
-from . import commands
+import config
+import commands
 import threading
 
 

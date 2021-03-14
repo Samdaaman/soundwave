@@ -1,8 +1,7 @@
-from . import config
-from . import commands
+import config
+import commands
 from typing import List
 import base64
-from time import sleep
 
 
 def send_command_to_target(command: commands.Command, target: config.Target):

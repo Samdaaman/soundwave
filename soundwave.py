@@ -1,8 +1,8 @@
-from . import web_server
-from . import config
-from . import commands
-from . import communication
-from . import results
+import web_server
+import config
+import commands
+import communication
+import results
 
 
 def main():
@@ -60,3 +60,7 @@ def main():
                     result = communication.send_command_to_target(command, config.targets[num - 1])
                     if result is not None:
                         print(result)
+
+
+if __name__ == '__main__':
+    main()

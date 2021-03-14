@@ -1,6 +1,6 @@
-from . import config
+import config
 import threading
-from . import communication
+import communication
 
 
 def new_target(remote_ip: str) -> int:

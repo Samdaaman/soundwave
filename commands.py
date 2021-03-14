@@ -1,4 +1,4 @@
-from . import config
+import config
 from dataclasses import dataclass
 
 

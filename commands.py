@@ -1,5 +1,5 @@
 import config
-from ravage.command_keys import COMMAND_KEYS
+from ravage.constants import COMMAND_KEYS
 from typing import Union
 
 

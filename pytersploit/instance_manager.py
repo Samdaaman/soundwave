@@ -1,4 +1,4 @@
-import logging
+import my_logging
 from typing import List, Optional, Tuple
 from queue import Empty, SimpleQueue
 from threading import Thread
@@ -7,7 +7,7 @@ from time import sleep
 from pyterpreter import Message
 from instance import Instance
 
-logger = logging.Logger('INSTANCE_MANAGER')
+logger = my_logging.Logger('INSTANCE_MANAGER')
 
 
 class InstanceManager:

@@ -1,5 +1,5 @@
 import socket
-import logging
+import my_logging
 from threading import Thread
 from typing import Tuple
 from base64 import b64decode
@@ -8,7 +8,7 @@ from pyterpreter import Core
 from instance import Instance
 from instance_manager import InstanceManager
 
-logger = logging.Logger('STAGER')
+logger = my_logging.Logger('STAGER')
 
 
 def _handler(sock: socket.socket, address: Tuple[str, int]):

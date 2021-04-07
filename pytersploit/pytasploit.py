@@ -1,8 +1,9 @@
-import logging
-from typing import Optional
-import cmd2
-import cmd2.argparse_custom
-import sys
+import my_logging
+from typing import Callable, Optional
+from prompt_toolkit import PromptSession
+from prompt_toolkit.validation import DynamicValidator, Validator
+from prompt_toolkit.completion import NestedCompleter, DynamicCompleter
+import os
 
 import stager
 from instance import Instance
@@ -10,51 +11,100 @@ from instance_manager import InstanceManager
 import web_server
 from pyterpreter import Message
 
-logger = logging.Logger('APP')
+logger = my_logging.Logger('APP')
 
 
-class Application(cmd2.Cmd):
+def get_lambda(func: Callable, *args):
+    return lambda: func(*args)
+
+
+class App:
+    selected_instance: Optional[Instance] = None
+
     def __init__(self):
-        super().__init__()
-        self.debug = True
-        self.instance: Optional[Instance] = None
-        self.add_settable(cmd2.Settable('instance', InstanceManager.get_by_uid, 'Selected instance id', choices_function=InstanceManager.get_uids))
+        while True:
+            session = PromptSession()
+            command = session.prompt(
+                f'[{self.selected_instance}]> ',
+                completer=DynamicCompleter(lambda: NestedCompleter.from_nested_dict(self.completions)),
+                pre_run=session.default_buffer.start_completion,
+                validator=DynamicValidator(lambda: Validator.from_callable(lambda x: self.get_callable_from_command(x) is not None))
+            )
 
-    def _check_active_instance_selected(self) -> bool:
-        if self.instance is not None and self.instance.active is True:
-            return True
-        else:
-            logger.info(f'Instance {self.instance} is not active')
-            return False
+            result = self.get_callable_from_command(command)()
+            if isinstance(result, (list, tuple)):
+                print('\n'.join(str(line) for line in result))
+            elif result is not None:
+                print(str(result))
 
-    do_show_parser = cmd2.Cmd2ArgumentParser()
-    do_show_parser.add_argument('name', choices=['instances'])
+    def get_callable_from_command(self, command: str) -> Optional[Callable]:
+        try:
+            command_parts = command.split(' ')
+            item = self.completions_with_functions
+            for i in range(len(command_parts)):
+                command_part = command_parts[i]
+                item = item[command_part]
+                if callable(item):
+                    return item
+        except KeyError:
+            pass
 
-    @cmd2.with_argparser(do_show_parser)
-    def do_show(self, args):
-        if args.name == 'instances':
-            self.poutput('\n'.join(str(instance) for instance in InstanceManager.get_all()))
+    @property
+    def completions_with_functions(self):
+        global_commands = {
+            'show': {
+                'instances': InstanceManager.get_uids
+            },
+            'set': {
+                'instance': {
+                    uid: get_lambda(self._do_set_selected_instance, uid) for uid in InstanceManager.get_uids()
+                }
+            },
 
-    def my_choices_provider(self):
-        return ['1', '2']
+        }
+        instance_commands = {
+            'run_script': {
+                script: get_lambda(self._do_run_script, script) for script in map(lambda path: os.path.split(path)[-1], web_server.get_available_scripts())
+            }
+        }
+        return {**global_commands, **instance_commands} if self.selected_instance is not None and self.selected_instance.active else global_commands
 
-    do_run_script_parser = cmd2.Cmd2ArgumentParser()
-    do_run_script_parser.add_argument('name', help='Name of script', choices_provider=my_choices_provider)
+    @property
+    def completions(self):
+        completions = {}
 
-    @cmd2.with_argparser(do_run_script_parser)
-    def do_run_script(self, args):
-        if self._check_active_instance_selected():
-            InstanceManager.messages_to_send.put((self.instance, Message(Message.RUN_SCRIPT, args.name)))
-            logger.info(f'Running script {args.name}')
+        def strip_functions(key_path):
+            item = self.completions_with_functions
+            for key in key_path:
+                item = item[key]
+            for key in item.keys():
+                if callable(item[key]):
+                    new_item = completions
+                    for new_key in key_path:
+                        if new_item.get(new_key, None) is None:
+                            new_item[new_key] = {}
+                        new_item = new_item[new_key]
+                    new_item[key] = None
+                else:
+                    strip_functions([*key_path, key])
+
+        strip_functions([])
+        return completions
+
+    def _do_set_selected_instance(self, uid: str):
+        self.selected_instance = InstanceManager.get_by_uid(uid)
+
+    def _do_run_script(self, script):
+        InstanceManager.messages_to_send.put((self.selected_instance, Message(Message.RUN_SCRIPT, script)))
+        logger.info(f'Running script {script}')
 
 
 def main():
-    app = Application()
-    logging.set_output_func(app.poutput)
+    my_logging.set_output_func(print)
+    web_server.start(wait=False)
     stager.initialise()
     InstanceManager.start_worker()
-    web_server.start()
-    sys.exit(app.cmdloop())
+    App()
 
 
 if __name__ == '__main__':

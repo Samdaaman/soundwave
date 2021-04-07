@@ -17,7 +17,7 @@ def get_available_scripts():
     return scripts
 
 
-def start(block=False):
+def start(block=False, wait=True):
     if block:
         http.server.ThreadingHTTPServer(
             ('0.0.0.0', PORT),
@@ -25,12 +25,13 @@ def start(block=False):
         ).serve_forever()
     else:
         Thread(target=start, args=(True,), daemon=True).start()
-        while True:
-            ping = subprocess.run(f'curl -s http://localhost:{PORT}', shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stdin=subprocess.DEVNULL)
-            if ping.returncode == 0:
-                return
-            else:
-                sleep(0.5)
+        if wait:
+            while True:
+                ping = subprocess.run(f'curl -s http://localhost:{PORT}', shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stdin=subprocess.DEVNULL)
+                if ping.returncode == 0:
+                    return
+                else:
+                    sleep(0.5)
 
 
 class RequestHandler(http.server.SimpleHTTPRequestHandler):

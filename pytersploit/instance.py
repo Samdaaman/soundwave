@@ -2,11 +2,11 @@ import socket
 import datetime
 from queue import SimpleQueue
 from threading import Thread
-import logging
+import my_logging
 
 from pyterpreter import Core, Message
 
-logger = logging.Logger('INSTANCE')
+logger = my_logging.Logger('INSTANCE')
 
 
 class Instance:
@@ -22,7 +22,7 @@ class Instance:
     _receiver_thread: Thread
 
     def __init__(self, ip: str, port: int, sock: socket.socket, username: str):
-        self.uid = f'{username}@{ip}:{port}'
+        self.uid = f'{username}:{ip}:{port}'
         self.ip = ip
         self.port = port
         self.sock = sock
@@ -33,7 +33,7 @@ class Instance:
         self._receiver_thread = Thread(target=self._receive_messages_forever, daemon=True)
 
     def __str__(self):
-        return f'{self.username} [{self.ip}]'
+        return f'{self.username}@{self.ip}'
 
     @property
     def is_root(self):

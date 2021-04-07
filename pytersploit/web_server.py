@@ -8,21 +8,29 @@ from time import sleep
 PORT = 1338
 
 
-def start():
-    Thread(target=_start, daemon=True).start()
-    while True:
-        ping = subprocess.run(f'curl -s http://localhost:{PORT}', shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stdin=subprocess.DEVNULL)
-        if ping.returncode == 0:
-            return
-        else:
-            sleep(0.5)
+def get_available_scripts():
+    scripts = []
+    for file in os.listdir(os.path.join('resources', 'scripts')):
+        path = os.path.join('resources', 'scripts', file)
+        if os.path.isfile(path):
+            scripts.append(path)
+    return scripts
 
 
-def _start():
-    http.server.ThreadingHTTPServer(
-        ('0.0.0.0', PORT),
-        RequestHandler
-    ).serve_forever()
+def start(block=False):
+    if block:
+        http.server.ThreadingHTTPServer(
+            ('0.0.0.0', PORT),
+            RequestHandler
+        ).serve_forever()
+    else:
+        Thread(target=start, args=(True,), daemon=True).start()
+        while True:
+            ping = subprocess.run(f'curl -s http://localhost:{PORT}', shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stdin=subprocess.DEVNULL)
+            if ping.returncode == 0:
+                return
+            else:
+                sleep(0.5)
 
 
 class RequestHandler(http.server.SimpleHTTPRequestHandler):

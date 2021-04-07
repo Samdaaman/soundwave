@@ -1,34 +1,33 @@
 import socket
 from threading import Thread
-import logging
 from typing import Tuple
 from queue import SimpleQueue
 from base64 import b64decode, b64encode
 import subprocess
-
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger()
+import random
+import string
 
 
 class Message:
     REPLY = 'REPLY'
-    SCRIPT = 'SCRIPT'
+    RUN_SCRIPT = 'RUN_SCRIPT'
     conversation_uid: str
     purpose: str
     args: Tuple[str]
 
-    def __init__(self, *args: str):
-        assert len(args) >= 2
-        self.conversation_uid = args[0]
-        self.purpose = args[1]
-        self.args = args[2:]
+    def __init__(self, purpose: str, *args: str, conversation_uid=None):
+        assert len(args) >= 1
+        self.purpose = purpose
+        self.args = args
+        self.conversation_uid = conversation_uid if conversation_uid is not None else ''.join(random.choice(string.ascii_letters) for _ in range(16))
 
     def __str__(self):
-        return f'{self.purpose}:{self.args}'
+        return f'{self.conversation_uid}:{self.purpose}:{self.args}'
 
     @staticmethod
     def from_raw(line: bytes) -> 'Message':
-        return Message(*tuple(b64decode(line_part).decode() for line_part in line.split(b':')))
+        message_parts = tuple(b64decode(line_part).decode() for line_part in line.split(b':'))
+        return Message(message_parts[1], *message_parts[2:], conversation_uid=message_parts[0])
 
     def to_raw(self):
         return b':'.join(b64encode(line_part.encode()) for line_part in [self.conversation_uid, self.purpose, *self.args])
@@ -78,8 +77,8 @@ class MessageProcessor:
         MessageProcessor.resources_port = resources_port
         while True:
             message = Communication.messages_received.get()
-            logger.info(f'Processing: {message}')
-            if message.purpose == Message.SCRIPT:
+            print(f'Processing: {message}')
+            if message.purpose == Message.RUN_SCRIPT:
                 MessageProcessor._process_script(message)
             else:
                 send_error_message('process_messages_forever', f'Unknown message purpose {message.purpose}')
@@ -95,17 +94,16 @@ class MessageProcessor:
 
     @staticmethod
     def _process_script(message: Message):
-        uid = message.args[0]
-        script_name = message.args[1]
+        print(message)
+        script_name = message.args[0]
         script_data = MessageProcessor._get_resource('scripts', script_name)
-        logger.info(f'Opening process for {message.args[1]}')
         script = subprocess.Popen(['bash', '-s'], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = script.communicate(script_data)
         Communication.messages_to_send.put(Message(
             Message.REPLY,
-            uid,
             stdout.decode(),
-            stderr.decode()
+            stderr.decode(),
+            conversation_uid=message.conversation_uid
         ))
 
 

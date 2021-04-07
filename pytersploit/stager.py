@@ -5,9 +5,10 @@ from typing import Tuple
 from base64 import b64decode
 
 from pyterpreter import Core
-from instance import Instance, InstanceManager
+from instance import Instance
+from instance_manager import InstanceManager
 
-logger = logging.getLogger()
+logger = logging.Logger('STAGER')
 
 
 def _handler(sock: socket.socket, address: Tuple[str, int]):
@@ -19,10 +20,11 @@ def _handler(sock: socket.socket, address: Tuple[str, int]):
 
 def initialise(block=False):
     if block:
+        logger.info('Starting server')
         server = socket.create_server(('', 1337))
         while True:
             sock, address = server.accept()
             Thread(target=_handler, args=(sock, address), daemon=True).start()
     else:
-        Thread(target=initialise, args=(True,), daemon=True)
+        Thread(target=initialise, args=(True,), daemon=True).start()
 

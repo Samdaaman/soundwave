@@ -13,13 +13,15 @@ logger = logging.getLogger()
 class Message:
     REPLY = 'REPLY'
     SCRIPT = 'SCRIPT'
+    conversation_uid: str
     purpose: str
     args: Tuple[str]
 
     def __init__(self, *args: str):
-        assert len(args) >= 1
-        self.purpose = args[0]
-        self.args = args[1:]
+        assert len(args) >= 2
+        self.conversation_uid = args[0]
+        self.purpose = args[1]
+        self.args = args[2:]
 
     def __str__(self):
         return f'{self.purpose}:{self.args}'
@@ -29,35 +31,41 @@ class Message:
         return Message(*tuple(b64decode(line_part).decode() for line_part in line.split(b':')))
 
     def to_raw(self):
-        return b':'.join(b64encode(line_part.encode()) for line_part in [self.purpose, *self.args])
+        return b':'.join(b64encode(line_part.encode()) for line_part in [self.conversation_uid, self.purpose, *self.args])
 
 
-class Core:
+class Communication:
     messages_received = SimpleQueue()  # type: SimpleQueue[Message]
     messages_to_send = SimpleQueue()  # type: SimpleQueue[Message]
 
     @staticmethod
     def initialise_communication(sock: socket.socket):
-        Thread(target=Core._receive_messages_forever, args=(sock, Core.messages_received), daemon=True).start()
-        Thread(target=Core._send_messages_forever, args=(sock, Core.messages_to_send), daemon=True).start()
+        Thread(target=Communication._receive_messages_forever, args=(sock, Communication.messages_received), daemon=True).start()
+        Thread(target=Communication._send_messages_forever, args=(sock, Communication.messages_to_send), daemon=True).start()
 
     @staticmethod
     def _receive_messages_forever(sock: socket.socket, message_received_queue: 'SimpleQueue[Message]'):
         while True:
-            buffer = b''
-            while True:
-                chunk = sock.recv(1)
-                if b'\n' == chunk:
-                    logger.debug(f'Received message: {buffer}')
-                    message_received_queue.put(Message.from_raw(buffer))
-                    break
-                else:
-                    buffer += chunk
+            message_received_queue.put(Message.from_raw(Core.receive_line_from_sock(sock)))
 
     @staticmethod
     def _send_messages_forever(sock: socket.socket, message_to_send_queue: 'SimpleQueue[Message]'):
+        header_parts = [Config.username.encode()]
+        sock.send(b':'.join([b64encode(header_part) for header_part in header_parts]) + b'\n')
         while True:
             sock.send(message_to_send_queue.get().to_raw() + b'\n')
+
+
+class Core:
+    @staticmethod
+    def receive_line_from_sock(sock: socket.socket):
+        buffer = b''
+        while True:
+            chunk = sock.recv(1)
+            if b'\n' == chunk:
+                return buffer
+            else:
+                buffer += chunk
 
 
 class MessageProcessor:
@@ -69,7 +77,7 @@ class MessageProcessor:
         MessageProcessor.remote_ip = remote_ip
         MessageProcessor.resources_port = resources_port
         while True:
-            message = Core.messages_received.get()
+            message = Communication.messages_received.get()
             logger.info(f'Processing: {message}')
             if message.purpose == Message.SCRIPT:
                 MessageProcessor._process_script(message)
@@ -93,7 +101,7 @@ class MessageProcessor:
         logger.info(f'Opening process for {message.args[1]}')
         script = subprocess.Popen(['bash', '-s'], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = script.communicate(script_data)
-        Core.messages_to_send.put(Message(
+        Communication.messages_to_send.put(Message(
             Message.REPLY,
             uid,
             stdout.decode(),
@@ -101,14 +109,31 @@ class MessageProcessor:
         ))
 
 
-def initialise(uid: str, remote_ip: str, remote_port: int, resources_port: int, local_ip: str):
+def get_cmd_output(cmd: str, strip_new_line=True) -> str:
+    proc = subprocess.run(cmd, shell=True, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    if strip_new_line and proc.stdout.decode()[-1] == '\n':
+        return proc.stdout.decode()[:-1]
+    else:
+        return proc.stdout.decode()
+
+
+class Config:
+    username: str
+
+    @staticmethod
+    def initialise():
+        Config.username = get_cmd_output('whoami')
+
+
+def initialise(remote_ip: str, remote_port: int, resources_port: int, local_ip: str):
+    Config.initialise()
     sock = socket.create_connection((remote_ip, remote_port))
-    Core.initialise_communication(sock)
+    Communication.initialise_communication(sock)
     MessageProcessor.process_messages_forever(remote_ip, resources_port)
 
 
 def send_error_message(location: str, error: str):
-    Core.messages_to_send.put(Message(
+    Communication.messages_to_send.put(Message(
         'ERROR',
         location,
         error
@@ -117,7 +142,6 @@ def send_error_message(location: str, error: str):
 
 if __name__ == '__main__':
     initialise(
-        'YEET',
         'localhost',
         1337,
         1338,

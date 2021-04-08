@@ -65,7 +65,8 @@ class App:
         instance_commands = {
             'run_script': {
                 script: get_lambda(self._do_run_script, script) for script in map(lambda path: os.path.split(path)[-1], web_server.get_available_scripts())
-            }
+            },
+            'shell': self._do_open_shell
         }
         return {**global_commands, **instance_commands} if self.selected_instance is not None and self.selected_instance.active else global_commands
 
@@ -97,6 +98,9 @@ class App:
     def _do_run_script(self, script):
         InstanceManager.messages_to_send.put((self.selected_instance, Message(Message.RUN_SCRIPT, script)))
         logger.info(f'Running script {script}')
+
+    def _do_open_shell(self):
+        InstanceManager.messages_to_send.put((self.selected_instance, Message(Message.OPEN_SHELL)))
 
 
 def main():

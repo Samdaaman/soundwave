@@ -1,8 +1,9 @@
 import my_logging
 from typing import Callable, Optional
-from prompt_toolkit import PromptSession
+from prompt_toolkit import Application, PromptSession
 from prompt_toolkit.validation import DynamicValidator, Validator
 from prompt_toolkit.completion import NestedCompleter, DynamicCompleter
+from prompt_toolkit.patch_stdout import patch_stdout
 import os
 
 import stager
@@ -18,24 +19,26 @@ def get_lambda(func: Callable, *args):
     return lambda: func(*args)
 
 
-class App:
+class App():
     selected_instance: Optional[Instance] = None
 
     def __init__(self):
-        while True:
+        InstanceManager.on_instances_update = self._list_instances
+        with patch_stdout(raw=True):
             session = PromptSession()
-            command = session.prompt(
-                f'[{self.selected_instance}]> ',
-                completer=DynamicCompleter(lambda: NestedCompleter.from_nested_dict(self.completions)),
-                pre_run=session.default_buffer.start_completion,
-                validator=DynamicValidator(lambda: Validator.from_callable(lambda x: self.get_callable_from_command(x) is not None))
-            )
+            while True:
+                command = session.prompt(
+                    lambda: f'[{self.selected_instance if self.selected_instance in InstanceManager.get_all() else None}]> ',
+                    completer=DynamicCompleter(lambda: NestedCompleter.from_nested_dict(self.completions)),
+                    pre_run=session.default_buffer.start_completion,
+                    validator=DynamicValidator(lambda: Validator.from_callable(lambda x: self.get_callable_from_command(x) is not None))
+                )
 
-            result = self.get_callable_from_command(command)()
-            if isinstance(result, (list, tuple)):
-                print('\n'.join(str(line) for line in result))
-            elif result is not None:
-                print(str(result))
+                result = self.get_callable_from_command(command)()
+                if isinstance(result, (list, tuple)):
+                    logger.output('\n'.join(str(line) for line in result))
+                elif result is not None:
+                    logger.output(str(result))
 
     def get_callable_from_command(self, command: str) -> Optional[Callable]:
         try:
@@ -53,7 +56,7 @@ class App:
     def completions_with_functions(self):
         global_commands = {
             'show': {
-                'instances': InstanceManager.get_uids
+                'instances': self._list_instances
             },
             'set': {
                 'instance': {
@@ -97,15 +100,17 @@ class App:
 
     def _do_run_script(self, script):
         InstanceManager.messages_to_send.put((self.selected_instance, Message(Message.RUN_SCRIPT, script)))
-        logger.info(f'Running script {script}')
 
     def _do_open_shell(self):
         InstanceManager.messages_to_send.put((self.selected_instance, Message(Message.OPEN_SHELL)))
 
+    def _list_instances(self):
+        for instance in InstanceManager.get_all():
+            logger.output(f'{"==> " if instance == self.selected_instance else "    "}{instance}')
+
 
 def main():
-    my_logging.set_output_func(print)
-    web_server.start(wait=False)
+    web_server.start(should_wait=False)
     stager.initialise()
     InstanceManager.start_worker()
     App()

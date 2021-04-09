@@ -30,10 +30,11 @@ def _handler(sock: socket.socket, address: Tuple[str, int]):
 
 def initialise(block=False):
     if block:
-        logger.info('Starting server')
         server = socket.create_server(('', 1337))
+        logger.info('Started staging handler')
         while True:
             sock, address = server.accept()
+            logger.debug(f'New connection on {address}')
             Thread(target=_handler, args=(sock, address), daemon=True).start()
     else:
         Thread(target=initialise, args=(True,), daemon=True).start()

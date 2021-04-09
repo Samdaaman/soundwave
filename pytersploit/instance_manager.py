@@ -1,8 +1,9 @@
 import my_logging
-from typing import List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 from queue import Empty, SimpleQueue
 from threading import Thread
 from time import sleep
+from datetime import datetime
 
 from pyterpreter import Message
 from instance import Instance
@@ -16,6 +17,7 @@ class InstanceManager:
     messages_to_send: 'SimpleQueue[Tuple[Instance, Message]]' = SimpleQueue()
     messages_sent: List[Tuple[Instance, Message]] = []
     messages_received: List[Tuple[Instance, Message]] = []
+    on_instances_update: Callable[[], None] = lambda: None
 
     @staticmethod
     def get_uids():
@@ -37,7 +39,7 @@ class InstanceManager:
         for instance, message in InstanceManager.messages_sent[::-1]:
             if message.conversation_uid == uid:
                 return instance
-        raise Exception('Could not find conversation')
+        raise Exception(f'Could not find conversation {uid}')
 
     @staticmethod
     def try_add(instance: Instance):
@@ -45,13 +47,7 @@ class InstanceManager:
             instance.start_communication()
             InstanceManager._instances.append(instance)
             logger.info(f'Added instance {instance}')
-
-    @staticmethod
-    def try_add(instance: Instance):
-        if not any([instance.ip == test.ip and instance.username == test.username for test in InstanceManager._instances]):
-            instance.start_communication()
-            InstanceManager._instances.append(instance)
-            logger.info(f'Added instance {instance}')
+            InstanceManager.on_instances_update()
 
     @staticmethod
     def _worker_poll():
@@ -73,6 +69,7 @@ class InstanceManager:
                 except Empty:
                     break
                 else:
+                    instance.last_message = datetime.now().timestamp()
                     if message.purpose == message.REPLY:
                         for previous_instance, previous_message in InstanceManager.messages_sent[::-1]:
                             if previous_instance == instance and previous_message.conversation_uid == message.conversation_uid:
@@ -80,15 +77,28 @@ class InstanceManager:
                                 InstanceManager.messages_received.append((instance, message))
                                 break
                         else:
-                            raise Exception(f'Could not find previous message for reply: {message}')
-                    else:
-                        raise Exception(f'Unknown received message purpose: {message.purpose}')
+                            logger.error('_worker_poll()', Exception(f'Could not find previous message for reply: {message}'))
+                    elif message.purpose != Message.PONG:
+                        logger.error('_worker_poll()', Exception(f'Unknown received message purpose: {message.purpose}'))
+
+        # Kill old instances
+        updated = False
+        for instance in InstanceManager._instances:
+            if not instance.active:
+                InstanceManager._instances.remove(instance)
+                logger.info(f'Removed unresponsive instance: {instance}')
+                updated = True
+        if updated:
+            InstanceManager.on_instances_update()
 
     @staticmethod
     def start_worker(block=False):
         if block:
             while True:
-                InstanceManager._worker_poll()
+                try:
+                    InstanceManager._worker_poll()
+                except Exception as ex:
+                    logger.error('_worker_poll()', ex)
                 sleep(0.5)
         else:
             Thread(target=InstanceManager.start_worker, args=(True,), daemon=True).start()

@@ -1,8 +1,8 @@
 import socket
-import datetime
 from queue import SimpleQueue
 from threading import Thread
 import my_logging
+from datetime import datetime
 
 from pyterpreter import Core, Message
 
@@ -27,7 +27,7 @@ class Instance:
         self.port = port
         self.sock = sock
         self.username = username
-        self.last_message = int(datetime.datetime.now().timestamp())
+        self.last_message = int(datetime.now().timestamp())
         self.message_received_queue = SimpleQueue()  # type: SimpleQueue[Message]
         self.message_to_send_queue = SimpleQueue()  # type: SimpleQueue[Message]
         self._receiver_thread = Thread(target=self._receive_messages_forever, daemon=True)
@@ -41,7 +41,7 @@ class Instance:
 
     @property
     def active(self):
-        return True
+        return datetime.now().timestamp() - self.last_message < 5
 
     def start_communication(self):
         self._receiver_thread.start()

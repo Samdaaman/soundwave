@@ -26,7 +26,7 @@ class ReplyHandler:
         os.path.exists(shell_stdout_filename) and os.unlink(shell_stdout_filename)
         os.mkfifo(shell_stdin_filename)
         os.mkfifo(shell_stdout_filename)
-        subprocess.run(f'tmux new-window -n {instance.username}@{instance.ip} {os.path.join(os.path.dirname(__file__), "shell", "shell")} {shell_stdin_filename} {shell_stdout_filename}', shell=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(['tmux', 'new-window', '-n', f'sh:{instance.username}', f'{os.path.join(os.path.dirname(__file__), "..", "shell", "shell")} {shell_stdin_filename} {shell_stdout_filename}'], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         shell_stdin = open(shell_stdin_filename, 'wb', 0)
         shell_stdout = open(shell_stdout_filename, 'rb', 0)
 

@@ -50,7 +50,7 @@ void enabled_raw_mode()
 
 void stdin_to_output(void *_)
 {
-    fprintf(output, "python3 -c 'import pty; pty.spawn(\"/bin/bash\")'\n");
+    // fprintf(output, "python3 -c 'import pty; pty.spawn(\"/bin/bash\")'\n");
     while (1)
     {
         char c;

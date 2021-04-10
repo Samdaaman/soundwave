@@ -42,12 +42,15 @@ class InstanceManager:
         raise Exception(f'Could not find conversation {uid}')
 
     @staticmethod
-    def try_add(instance: Instance):
+    def try_add(instance: Instance) -> bool:
         if not any([instance.ip == test.ip and instance.username == test.username for test in InstanceManager._instances]):
             instance.start_communication()
             InstanceManager._instances.append(instance)
             logger.info(f'Added instance {instance}')
             InstanceManager.on_instances_update()
+            return True
+        else:
+            return False
 
     @staticmethod
     def _worker_poll():

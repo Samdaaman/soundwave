@@ -9,6 +9,7 @@ from instance import Instance
 from instance_manager import InstanceManager
 from reply_handler import ReplyHandler
 
+PORT = 50000
 logger = my_logging.Logger('STAGER')
 
 
@@ -18,9 +19,9 @@ def _handler(sock: socket.socket, address: Tuple[str, int]):
     header_parts = [b64decode(header_part).decode() for header_part in header.split(b':')]
     logger.debug(f'Connected on {address[0]}:{address[1]} {header_parts}')
     if len(header_parts) == 1:
-        logger.debug('Trying to add instance')
-        InstanceManager.try_add(Instance(address[0], address[1], sock, header_parts[0]))
-    elif header_parts[1] == Message.OPEN_SHELL:
+        if not InstanceManager.try_add(Instance(address[0], address[1], sock, header_parts[0])):
+            sock.close()
+    elif header_parts[1] == Message.OPEN_SHELL_TUNNELED:
         logger.debug('Trying to open shell')
         instance = InstanceManager.get_by_conversation_uid(header_parts[2])
         ReplyHandler.handle_open_shell(instance, sock)
@@ -30,7 +31,7 @@ def _handler(sock: socket.socket, address: Tuple[str, int]):
 
 def initialise(block=False):
     if block:
-        server = socket.create_server(('', 1337))
+        server = socket.create_server(('', PORT))
         logger.info('Started staging handler')
         while True:
             sock, address = server.accept()

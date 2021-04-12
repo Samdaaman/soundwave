@@ -1,4 +1,5 @@
 from colorama import Fore, Style
+import traceback
 
 
 class Logger:
@@ -23,5 +24,7 @@ class Logger:
     def output(self, line: str):
         self._print(line, Fore.YELLOW, False)
 
-    def error(self, location: str, error: Exception):
-        self._print(f'Error in {location}: {error.args}', Fore.RED)
+    def error(self, location: str, description=None):
+        if description is None:
+            description = traceback.format_exc()
+        self._print(f'Error in {location}: \n{description}', Fore.LIGHTRED_EX)

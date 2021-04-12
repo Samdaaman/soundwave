@@ -4,6 +4,7 @@ from queue import Empty, SimpleQueue
 from threading import Thread
 from time import sleep
 from datetime import datetime
+import traceback
 
 from pyterpreter import Message
 from instance import Instance
@@ -81,6 +82,10 @@ class InstanceManager:
                                 break
                         else:
                             logger.error('_worker_poll()', Exception(f'Could not find previous message for reply: {message}'))
+                    elif message.purpose == Message.LOG:
+                        my_logging.Logger(str(instance)).info(message.args[0])
+                    elif message.purpose == Message.ERROR:
+                        my_logging.Logger(str(instance)).error(message.args[0])
                     elif message.purpose != Message.PONG:
                         logger.error('_worker_poll()', Exception(f'Unknown received message purpose: {message.purpose}'))
 
@@ -101,7 +106,7 @@ class InstanceManager:
                 try:
                     InstanceManager._worker_poll()
                 except Exception as ex:
-                    logger.error('_worker_poll()', ex)
+                    logger.error('_worker_poll()')
                 sleep(0.5)
         else:
             Thread(target=InstanceManager.start_worker, args=(True,), daemon=True).start()

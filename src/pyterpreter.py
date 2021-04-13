@@ -263,7 +263,6 @@ def main_detached():
 
 
 def main():
-    print(os.environ)
     Env.initialise()
     Config.initialise()
     if Env.layer == 0:

